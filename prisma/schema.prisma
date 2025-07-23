@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Ats_User {
+  id       Int         @id @default(autoincrement())
+  name     String
+  email    String      @unique
+  number   String
+  logins   Ats_Login[] // relation to Ats_Login
+}
+
+model Ats_Login {
+  id        Int        @id @default(autoincrement())
+  userId    Int
+  loggedAt  DateTime   @default(now())
+
+  user      Ats_User   @relation(fields: [userId], references: [id])
+}
+
+model Ats_JobPost {
+  id              Int      @id @default(autoincrement())
+  title           String   
+  company         String
+  department      String?
+  internalSPOC    String
+  recruiter       String?
+  jobType         String   
+  experienceLevel String?  
+  country         String
+  city            String
+  fullLocation    String
+  workType        String? 
+  salaryMin       Int
+  salaryMax       Int
+  priority        String?  
+  description     String
+  requirements    String   
+  requiredSkills  String  
+  benefits        String   
+  createdAt       DateTime @default(now())
+}
