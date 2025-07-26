@@ -1,5 +1,45 @@
 import prisma from '../prismaClient.js';
 
+// Helper function to create SEO-friendly slug
+const createJobSlug = (job) => {
+  const title = job.title.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .trim();
+  
+  const company = job.company.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+  
+  const location = job.city.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+  
+  const experience = job.experienceLevel ? 
+    job.experienceLevel.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim() : 
+    'freshers';
+  
+  const jobType = job.jobType ? 
+    job.jobType.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim() : 
+    'full-time';
+  
+  // Create full descriptive URL like Naukri.com
+  return `job-listings-${title}-${experience}-${jobType}-${company}-${location}-${job.id}`;
+};
+
 export const createJobPost = async (req, res) => {
   const {
     title,
@@ -59,7 +99,12 @@ export const createJobPost = async (req, res) => {
 export const getJobPosts = async (req, res) => {
   try {
     const jobs = await prisma.ats_JobPost.findMany();
-    res.status(200).json({ jobs });
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const jobsWithUrl = jobs.map(job => ({
+      ...job,
+      applyUrl: `${baseUrl}/api/job-listings/${createJobSlug(job)}`
+    }));
+    res.status(200).json({ jobs: jobsWithUrl });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching job posts', error: error.message });
   }

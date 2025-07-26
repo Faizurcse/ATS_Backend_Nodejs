@@ -44,4 +44,40 @@ model Ats_JobPost {
   requiredSkills  String  
   benefits        String   
   createdAt       DateTime @default(now())
+  
+  // Relation to applications
+  applications    CandidateApplication[]
+}
+
+model CandidateApplication {
+  id                    Int      @id @default(autoincrement())
+  jobId                 Int
+  
+  // Personal Information
+  firstName             String
+  lastName              String
+  email                 String
+  phone                 String
+  currentLocation       String?
+  
+  // Resume & Cover Letter
+  resumeFilePath        String?  // File path in uploads folder
+  coverLetter           String?
+  
+  // Additional Questions
+  keySkills             String?  // Q1. Key skills relevant to position
+  salaryExpectation     Int?     // Q3. Current salary expectation
+  noticePeriod          String?  // Q4. Notice period
+  yearsOfExperience     String?  // Q5. Years of experience
+  remoteWork            Boolean? // Q6. Open to remote work
+  startDate             String?  // Q7. When can you start
+  portfolioUrl          String?  // Q8. Portfolio or GitHub link
+  
+  // Application Status
+  status                String   @default("pending") // pending, shortlisted, rejected, hired
+  appliedAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relation to job
+  job                   Ats_JobPost @relation(fields: [jobId], references: [id], onDelete: Cascade)
 }
