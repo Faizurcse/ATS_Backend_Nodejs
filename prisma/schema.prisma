@@ -35,7 +35,8 @@ model Ats_JobPost {
   country         String
   city            String
   fullLocation    String
-  workType        String? 
+  workType        WorkType @default(ONSITE)
+  jobStatus       JobStatus @default(ACTIVE)
   salaryMin       Int
   salaryMax       Int
   priority        String?  
@@ -47,6 +48,19 @@ model Ats_JobPost {
   
   // Relation to applications
   applications    CandidateApplication[]
+}
+
+enum WorkType {
+  ONSITE
+  REMOTE
+  HYBRID
+}
+
+enum JobStatus {
+  ACTIVE
+  PAUSED
+  CLOSED
+  FILLED
 }
 
 model CandidateApplication {
