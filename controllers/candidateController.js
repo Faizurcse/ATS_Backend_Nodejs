@@ -290,7 +290,16 @@ export const submitJobApplication = async (req, res) => {
   }
 };
 
-// Get application status
+/**
+ * Get Application Status
+ * 
+ * Retrieves the detailed status of a specific job application.
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Path parameters
+ * @param {string} req.params.applicationId - The application ID
+ * @param {Object} res - Express response object
+ */
 export const getApplicationStatus = async (req, res) => {
   try {
     const { applicationId } = req.params;
@@ -313,5 +322,385 @@ export const getApplicationStatus = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: 'Error fetching application status', error: error.message });
+  }
+};
+
+/**
+ * Get All Candidates with Applied Jobs
+ * 
+ * Retrieves a paginated list of all candidates with their applied jobs and resume download URLs.
+ * Supports filtering by status and searching by name, email, or skills.
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} req.query - Query parameters
+ * @param {number} req.query.page - Page number (default: 1)
+ * @param {number} req.query.limit - Number per page (default: 10)
+ * @param {string} req.query.status - Filter by status (pending, shortlisted, rejected, hired, all)
+ * @param {string} req.query.search - Search term for name, email, or skills
+ * @param {Object} res - Express response object
+ */
+export const getAllCandidates = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, search } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build where clause for filtering
+    let whereClause = {};
+    
+    // Filter by application status if provided
+    if (status && status !== 'all') {
+      whereClause.status = status;
+    }
+    
+    // Add search functionality across multiple fields
+    if (search) {
+      whereClause.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { keySkills: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    // Fetch candidates with pagination and job details
+    const candidates = await prisma.candidateApplication.findMany({
+      where: whereClause,
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: true,
+            city: true,
+            jobType: true,
+            experienceLevel: true,
+            workType: true,
+            jobStatus: true,
+            salaryMin: true,
+            salaryMax: true,
+            priority: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: {
+        appliedAt: 'desc' // Most recent applications first
+      },
+      skip: skip,
+      take: parseInt(limit)
+    });
+
+    // Get total count for pagination metadata
+    const totalCandidates = await prisma.candidateApplication.count({
+      where: whereClause
+    });
+
+    // Transform data to include computed fields and download URLs
+    const transformedCandidates = candidates.map(candidate => ({
+      id: candidate.id,
+      fullName: `${candidate.firstName} ${candidate.lastName}`,
+      firstName: candidate.firstName,
+      lastName: candidate.lastName,
+      email: candidate.email,
+      phone: candidate.phone,
+      currentLocation: candidate.currentLocation,
+      keySkills: candidate.keySkills,
+      salaryExpectation: candidate.salaryExpectation,
+      noticePeriod: candidate.noticePeriod,
+      yearsOfExperience: candidate.yearsOfExperience,
+      remoteWork: candidate.remoteWork,
+      startDate: candidate.startDate,
+      portfolioUrl: candidate.portfolioUrl,
+      status: candidate.status,
+      appliedAt: candidate.appliedAt,
+      updatedAt: candidate.updatedAt,
+      // Generate resume download URL if resume exists
+      resumeDownloadUrl: candidate.resumeFilePath ? 
+        `${process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`}/api/candidates/${candidate.id}/resume` : null,
+      appliedJobs: [candidate.job]
+    }));
+
+    // Return paginated response with metadata
+    res.status(200).json({
+      candidates: transformedCandidates,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCandidates / parseInt(limit)),
+        totalCandidates,
+        hasNextPage: skip + parseInt(limit) < totalCandidates,
+        hasPrevPage: parseInt(page) > 1
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching candidates', error: error.message });
+  }
+};
+
+/**
+ * Get Candidate by ID with All Applied Jobs
+ * 
+ * Retrieves detailed information about a specific candidate including all their job applications.
+ * Groups all applications by the candidate's email address to show complete application history.
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Path parameters
+ * @param {string} req.params.candidateId - The candidate ID
+ * @param {Object} res - Express response object
+ */
+export const getCandidateById = async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+
+    // First, get the candidate's basic information
+    const candidate = await prisma.candidateApplication.findFirst({
+      where: { id: parseInt(candidateId) }
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ message: 'Candidate not found' });
+    }
+
+    // Get all applications for this candidate (by email address)
+    // This shows the complete application history for the candidate
+    const allApplications = await prisma.candidateApplication.findMany({
+      where: { email: candidate.email },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: true,
+            city: true,
+            jobType: true,
+            experienceLevel: true,
+            workType: true,
+            jobStatus: true,
+            salaryMin: true,
+            salaryMax: true,
+            priority: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: {
+        appliedAt: 'desc' // Most recent applications first
+      }
+    });
+
+    // Transform and structure the response data
+    const candidateData = {
+      id: candidate.id,
+      fullName: `${candidate.firstName} ${candidate.lastName}`,
+      firstName: candidate.firstName,
+      lastName: candidate.lastName,
+      email: candidate.email,
+      phone: candidate.phone,
+      currentLocation: candidate.currentLocation,
+      keySkills: candidate.keySkills,
+      salaryExpectation: candidate.salaryExpectation,
+      noticePeriod: candidate.noticePeriod,
+      yearsOfExperience: candidate.yearsOfExperience,
+      remoteWork: candidate.remoteWork,
+      startDate: candidate.startDate,
+      portfolioUrl: candidate.portfolioUrl,
+      status: candidate.status,
+      appliedAt: candidate.appliedAt,
+      updatedAt: candidate.updatedAt,
+      // Generate resume download URL if resume exists
+      resumeDownloadUrl: candidate.resumeFilePath ? 
+        `${process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`}/api/candidates/${candidate.id}/resume` : null,
+      totalApplications: allApplications.length,
+      // Map all applications with their status and job details
+      appliedJobs: allApplications.map(app => ({
+        applicationId: app.id,
+        applicationStatus: app.status,
+        appliedAt: app.appliedAt,
+        job: app.job
+      }))
+    };
+
+    res.status(200).json(candidateData);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching candidate details', error: error.message });
+  }
+};
+
+/**
+ * Download Candidate Resume
+ * 
+ * Downloads the resume file for a specific candidate with proper content-type headers.
+ * Supports multiple file formats and handles missing files gracefully.
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} req.params - Path parameters
+ * @param {string} req.params.candidateId - The candidate ID
+ * @param {Object} res - Express response object
+ */
+export const downloadResume = async (req, res) => {
+  try {
+    const { candidateId } = req.params;
+
+    // Find the candidate by ID
+    const candidate = await prisma.candidateApplication.findUnique({
+      where: { id: parseInt(candidateId) }
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ message: 'Candidate not found' });
+    }
+
+    // Check if candidate has a resume file
+    if (!candidate.resumeFilePath) {
+      return res.status(404).json({ message: 'Resume not found for this candidate' });
+    }
+
+    // Verify the file exists on the filesystem
+    if (!fs.existsSync(candidate.resumeFilePath)) {
+      return res.status(404).json({ message: 'Resume file not found on server' });
+    }
+
+    // Determine content type based on file extension
+    const fileExtension = path.extname(candidate.resumeFilePath).toLowerCase();
+    let contentType = 'application/octet-stream';
+    
+    // Set appropriate content type for different file formats
+    switch (fileExtension) {
+      case '.pdf':
+        contentType = 'application/pdf';
+        break;
+      case '.doc':
+        contentType = 'application/msword';
+        break;
+      case '.docx':
+        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        break;
+      case '.jpg':
+      case '.jpeg':
+        contentType = 'image/jpeg';
+        break;
+      case '.png':
+        contentType = 'image/png';
+        break;
+    }
+
+    // Set headers for file download
+    const fileName = `${candidate.firstName}_${candidate.lastName}_resume${fileExtension}`;
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', fs.statSync(candidate.resumeFilePath).size);
+
+    // Stream the file for efficient memory usage
+    const fileStream = fs.createReadStream(candidate.resumeFilePath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Error downloading resume', error: error.message });
+  }
+};
+
+/**
+ * Get All Candidates Data (Complete)
+ * 
+ * Retrieves ALL candidates data without pagination - returns everything in one request.
+ * This endpoint gives you complete candidate information with all their applications.
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getAllCandidatesComplete = async (req, res) => {
+  try {
+    // Get ALL candidates without any pagination or limits
+    const allCandidates = await prisma.candidateApplication.findMany({
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: true,
+            city: true,
+            jobType: true,
+            experienceLevel: true,
+            workType: true,
+            jobStatus: true,
+            salaryMin: true,
+            salaryMax: true,
+            priority: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: {
+        appliedAt: 'desc' // Most recent applications first
+      }
+    });
+
+    // Group candidates by email to get all applications for each candidate
+    const candidatesByEmail = {};
+    
+    allCandidates.forEach(application => {
+      const email = application.email;
+      
+      if (!candidatesByEmail[email]) {
+        // First time seeing this candidate, create their profile
+        candidatesByEmail[email] = {
+          id: application.id,
+          fullName: `${application.firstName} ${application.lastName}`,
+          firstName: application.firstName,
+          lastName: application.lastName,
+          email: application.email,
+          phone: application.phone,
+          currentLocation: application.currentLocation,
+          keySkills: application.keySkills,
+          salaryExpectation: application.salaryExpectation,
+          noticePeriod: application.noticePeriod,
+          yearsOfExperience: application.yearsOfExperience,
+          remoteWork: application.remoteWork,
+          startDate: application.startDate,
+          portfolioUrl: application.portfolioUrl,
+          status: application.status,
+          appliedAt: application.appliedAt,
+          updatedAt: application.updatedAt,
+          resumeDownloadUrl: application.resumeFilePath ? 
+            `${process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`}/api/candidates/${application.id}/resume` : null,
+          totalApplications: 0,
+          appliedJobs: []
+        };
+      }
+      
+      // Add this application to the candidate's job list
+      candidatesByEmail[email].appliedJobs.push({
+        applicationId: application.id,
+        applicationStatus: application.status,
+        appliedAt: application.appliedAt,
+        job: application.job
+      });
+      
+      // Update total applications count
+      candidatesByEmail[email].totalApplications++;
+    });
+
+    // Convert to array and sort by most recent application
+    const candidatesArray = Object.values(candidatesByEmail).sort((a, b) => {
+      return new Date(b.appliedAt) - new Date(a.appliedAt);
+    });
+
+    // Return complete data
+    res.status(200).json({
+      success: true,
+      totalCandidates: candidatesArray.length,
+      totalApplications: allCandidates.length,
+      candidates: candidatesArray,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching all candidates data', 
+      error: error.message 
+    });
   }
 }; 
