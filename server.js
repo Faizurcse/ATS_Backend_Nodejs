@@ -5,6 +5,7 @@ import bodyParser from "body-parser";
 import authRoutes from "./routes/authRoutes.js"; // Import routes using ES Modules syntax
 import jobRoutes from "./routes/jobRoutes.js"; // Import jobRoutes
 import candidateRoutes from "./routes/candidateRoutes.js"; // Import candidate routes
+import pipelineRoutes from "./routes/pipelineRoutes.js"; // Import pipeline routes
 import prisma, { connectWithRetry } from "./prismaClient.js"; // Import Prisma client and connection function
 
 // Initialize dotenv for environment variables
@@ -54,6 +55,7 @@ const startHealthCheck = () => {
 app.use("/api/auth", authRoutes); // Authentication routes
 app.use("/api/jobs", jobRoutes); // Job posting routes (this is new)
 app.use("/api", candidateRoutes); // Candidate application routes
+app.use("/api/pipeline", pipelineRoutes); // Pipeline status routes
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
