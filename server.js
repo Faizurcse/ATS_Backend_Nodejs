@@ -9,6 +9,7 @@ import candidateRoutes from "./routes/candidateRoutes.js"; // Import candidate r
 import pipelineRoutes from "./routes/pipelineRoutes.js"; // Import pipeline routes
 import interviewRoutes from "./routes/interviewRoutes.js"; // Import interview routes
 import customerRoutes from "./routes/customerRoutes.js"; // Import customer routes
+import timesheetRoutes from "./routes/timesheetRoutes.js"; // Import timesheet routes
 import prisma, { connectWithRetry } from "./prismaClient.js"; // Import Prisma client and connection function
 
 // Initialize dotenv for environment variables
@@ -62,6 +63,7 @@ app.use("/api", candidateRoutes); // Candidate application routes
 app.use("/api/pipeline", pipelineRoutes); // Pipeline status routes
 app.use("/api/interviews", interviewRoutes); // Interview routes
 app.use("/api", customerRoutes); // Customer management routes
+app.use("/api", timesheetRoutes); // Timesheet management routes
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

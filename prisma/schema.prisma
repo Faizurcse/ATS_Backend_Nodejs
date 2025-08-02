@@ -165,3 +165,75 @@ model InterviewSchedule {
   // Relation to candidate application
   candidate       CandidateApplication @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 }
+
+// Timesheet Management Models
+model TimesheetEntry {
+  id              Int      @id @default(autoincrement())
+  
+  // Recruiter Information
+  recruiterId     String?  // Recruiter identifier
+  recruiterName   String   // Name of the recruiter
+  recruiterEmail  String?  // Email of the recruiter
+  
+  // Time Tracking
+  date            String   // Date in YYYY-MM-DD format
+  startTime       String?  // Start time in HH:MM format
+  endTime         String?  // End time in HH:MM format
+  hours           Decimal  @db.Decimal(4, 2) // Up to 99.99 hours
+  breakTime       Decimal? @db.Decimal(3, 2) // Break time in hours (0.00 to 9.99)
+  
+  // Entity Information
+  entityType      EntityType
+  entityId        String?  // ID of related entity (customer, job, candidate)
+  entityName      String?  // Name of the related entity
+  companyName     String?  // Company name (for jobs and candidates)
+  
+  // Task Details
+  taskType        String   // Task type like "Candidate Sourcing", "Client Meeting", etc.
+  taskCategory    TaskCategory @default(RECRUITMENT)
+  priority        Priority @default(MEDIUM)
+  status          TimesheetStatus @default(PENDING)
+  
+  // Additional Information
+  billable        Boolean  @default(true)
+  billableRate    Decimal? @db.Decimal(8, 2) // Hourly rate for billing
+  comments        String?  // Optional comments
+  attachments     String?  // Comma-separated file paths
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  approvedAt      DateTime? // When timesheet was approved
+  approvedBy      String?   // ID of the person who approved
+}
+
+enum EntityType {
+  CUSTOMER
+  JOB
+  CANDIDATE
+}
+
+enum TaskCategory {
+  RECRUITMENT
+  CLIENT_MANAGEMENT
+  ADMINISTRATIVE
+  TRAINING
+  MEETING
+  RESEARCH
+  OTHER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TimesheetStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  SUBMITTED
+}
