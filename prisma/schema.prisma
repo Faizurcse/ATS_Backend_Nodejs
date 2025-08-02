@@ -23,6 +23,51 @@ model Ats_Login {
   user      Ats_User   @relation(fields: [userId], references: [id])
 }
 
+// Customer Management Model - Simplified
+model Customer {
+  id                Int      @id @default(autoincrement())
+  companyName       String
+  industry          String
+  companySize       String?  // Small, Medium, Large, Enterprise
+  website           String?
+  description       String?
+  
+  // Status and Priority
+  status            CustomerStatus @default(ACTIVE)
+  priority          CustomerPriority @default(MEDIUM)
+  
+  // Location
+  country           String
+  city              String
+  address           String?
+  
+  // Financial Information
+  annualRevenue     String?
+  contractValue     Decimal? @db.Decimal(10, 2)
+  billingCycle      String?  // Monthly, Quarterly, Annual
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  jobs              Ats_JobPost[]
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+  SUSPENDED
+}
+
+enum CustomerPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 model Ats_JobPost {
   id              Int      @id @default(autoincrement())
   title           String   
@@ -46,8 +91,10 @@ model Ats_JobPost {
   benefits        String   
   createdAt       DateTime @default(now())
   
-  // Relation to applications
+  // Relations
   applications    CandidateApplication[]
+  customer       Customer? @relation(fields: [customerId], references: [id])
+  customerId     Int?
 }
 
 enum WorkType {
