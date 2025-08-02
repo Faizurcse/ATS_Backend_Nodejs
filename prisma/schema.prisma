@@ -94,4 +94,27 @@ model CandidateApplication {
   
   // Relation to job
   job                   Ats_JobPost @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  // Relation to interview schedules
+  interviewSchedules     InterviewSchedule[]
+}
+
+model InterviewSchedule {
+  id              Int      @id @default(autoincrement())
+  candidateId     Int
+  candidateName   String
+  interviewDate   DateTime
+  interviewTime   String
+  interviewType   String   // Technical, HR, Behavioral, Panel, Final
+  interviewMode   String   // Online, Onsite, Phone, Hybrid
+  platform        String?  // Zoom, Google Meet, Teams, etc.
+  meetingLink     String?
+  interviewer     String?
+  notes           String?
+  status          String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED, RESCHEDULED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relation to candidate application
+  candidate       CandidateApplication @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 }
