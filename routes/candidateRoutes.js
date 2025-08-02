@@ -9,6 +9,7 @@ import {
   getAllCandidatesComplete,
   upload
 } from '../controllers/candidateController.js';
+import { getAllCandidatesPipelineStatus } from '../controllers/pipelineController.js';
 
 const router = express.Router();
 
@@ -57,6 +58,24 @@ router.get('/candidates', getAllCandidates);
  * Example: GET /api/candidates/all
  */
 router.get('/candidates/all', getAllCandidatesComplete);
+
+/**
+ * GET /api/candidates/pipeline
+ * 
+ * Retrieves ALL candidates data with their pipeline status information.
+ * This endpoint provides complete candidate information including their current
+ * pipeline status for each job application, interview schedules, and pipeline statistics.
+ * 
+ * Returns:
+ * - All candidates with complete profiles
+ * - Pipeline status for each application
+ * - Interview schedules for each candidate
+ * - Pipeline statistics and breakdown
+ * - Resume download URLs
+ * 
+ * Example: GET /api/candidates/pipeline
+ */
+router.get('/candidates/pipeline', getAllCandidatesPipelineStatus);
 
 /**
  * GET /api/candidates/:candidateId

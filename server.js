@@ -4,6 +4,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import authRoutes from "./routes/authRoutes.js"; // Import routes using ES Modules syntax
 import jobRoutes from "./routes/jobRoutes.js"; // Import jobRoutes
+import jobDetailsRoutes from "./routes/jobDetailsRoutes.js"; // Import job details routes
 import candidateRoutes from "./routes/candidateRoutes.js"; // Import candidate routes
 import pipelineRoutes from "./routes/pipelineRoutes.js"; // Import pipeline routes
 import interviewRoutes from "./routes/interviewRoutes.js"; // Import interview routes
@@ -55,6 +56,7 @@ const startHealthCheck = () => {
 // Routes
 app.use("/api/auth", authRoutes); // Authentication routes
 app.use("/api/jobs", jobRoutes); // Job posting routes (this is new)
+app.use("/api/job-details", jobDetailsRoutes); // Job details routes
 app.use("/api", candidateRoutes); // Candidate application routes
 app.use("/api/pipeline", pipelineRoutes); // Pipeline status routes
 app.use("/api/interviews", interviewRoutes); // Interview routes
