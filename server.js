@@ -11,6 +11,7 @@ import interviewRoutes from "./routes/interviewRoutes.js"; // Import interview r
 import customerRoutes from "./routes/customerRoutes.js"; // Import customer routes
 import timesheetRoutes from "./routes/timesheetRoutes.js"; // Import timesheet routes
 import dashboardRoutes from "./routes/dashboardRoutes.js"; // Import dashboard routes
+import analyticsRoutes from "./routes/analyticsRoutes.js"; // Import analytics routes
 import prisma, { connectWithRetry } from "./prismaClient.js"; // Import Prisma client and connection function
 
 // Initialize dotenv for environment variables
@@ -66,6 +67,7 @@ app.use("/api/interviews", interviewRoutes); // Interview routes
 app.use("/api", customerRoutes); // Customer management routes
 app.use("/api", timesheetRoutes); // Timesheet management routes
 app.use("/api/dashboard", dashboardRoutes); // Dashboard routes
+app.use("/api/analytics", analyticsRoutes); // Analytics routes
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
