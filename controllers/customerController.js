@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { sendCustomerCreateEmail, sendCustomerUpdateEmail, sendCustomerDeleteEmail } from '../utils/mailer.js';
 const prisma = new PrismaClient();
 
 // Customer Controller with only 4 basic APIs
@@ -45,6 +46,8 @@ const customerController = {
       const total = await prisma.customer.count({ where });
       const totalPages = Math.ceil(total / limit);
 
+      console.log(`Fetched ${customers.length} customers, total: ${total}`);
+
       res.json({
         success: true,
         data: {
@@ -83,8 +86,11 @@ const customerController = {
         address,
         annualRevenue,
         contractValue,
-        billingCycle
+        billingCycle,
+        email
       } = req.body;
+
+      console.log('Creating customer with data:', { companyName, industry, country, city, email });
 
       // Validate required fields
       if (!companyName || !industry || !country || !city) {
@@ -108,9 +114,28 @@ const customerController = {
           address,
           annualRevenue,
           contractValue: contractValue ? parseFloat(contractValue) : null,
-          billingCycle
+          billingCycle,
+          email
         }
       });
+
+      console.log('Customer created successfully:', customer.id);
+
+      // Send welcome email if email is provided
+      if (email) {
+        try {
+          console.log('Sending welcome email to:', email);
+          await sendCustomerCreateEmail(email, customer, {
+            createdAt: customer.createdAt
+          });
+          console.log('Welcome email sent successfully');
+        } catch (emailError) {
+          console.error('Error sending customer creation email:', emailError);
+          // Don't fail the request if email fails
+        }
+      } else {
+        console.log('No email provided, skipping welcome email');
+      }
 
       res.status(201).json({
         success: true,
@@ -133,10 +158,50 @@ const customerController = {
       const { id } = req.params;
       const updateData = req.body;
 
+      console.log('Updating customer:', id, 'with data:', updateData);
+
+      // Get the customer before update to compare changes
+      const existingCustomer = await prisma.customer.findUnique({
+        where: { id: parseInt(id) }
+      });
+
+      if (!existingCustomer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Customer not found'
+        });
+      }
+
       const customer = await prisma.customer.update({
         where: { id: parseInt(id) },
         data: updateData
       });
+
+      // Determine which fields were updated
+      const updatedFields = [];
+      Object.keys(updateData).forEach(key => {
+        if (existingCustomer[key] !== customer[key]) {
+          updatedFields.push(key);
+        }
+      });
+
+      console.log('Customer updated successfully, fields changed:', updatedFields);
+
+      // Send update email if email is provided
+      if (customer.email) {
+        try {
+          console.log('Sending update email to:', customer.email);
+          await sendCustomerUpdateEmail(customer.email, customer, updatedFields, {
+            updatedAt: customer.updatedAt
+          });
+          console.log('Update email sent successfully');
+        } catch (emailError) {
+          console.error('Error sending customer update email:', emailError);
+          // Don't fail the request if email fails
+        }
+      } else {
+        console.log('No email found for customer, skipping update email');
+      }
 
       res.json({
         success: true,
@@ -158,9 +223,41 @@ const customerController = {
     try {
       const { id } = req.params;
 
+      console.log('Deleting customer:', id);
+
+      // Get the customer before deletion to send email
+      const customer = await prisma.customer.findUnique({
+        where: { id: parseInt(id) }
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: 'Customer not found'
+        });
+      }
+
       await prisma.customer.delete({
         where: { id: parseInt(id) }
       });
+
+      console.log('Customer deleted successfully');
+
+      // Send deletion email if email is provided
+      if (customer.email) {
+        try {
+          console.log('Sending deletion email to:', customer.email);
+          await sendCustomerDeleteEmail(customer.email, customer, {
+            deletedAt: new Date()
+          });
+          console.log('Deletion email sent successfully');
+        } catch (emailError) {
+          console.error('Error sending customer deletion email:', emailError);
+          // Don't fail the request if email fails
+        }
+      } else {
+        console.log('No email found for customer, skipping deletion email');
+      }
 
       res.json({
         success: true,

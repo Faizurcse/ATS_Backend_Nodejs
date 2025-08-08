@@ -31,6 +31,7 @@ model Customer {
   companySize       String?  // Small, Medium, Large, Enterprise
   website           String?
   description       String?
+  email             String?  // Contact email for customer
   
   // Status and Priority
   status            CustomerStatus @default(ACTIVE)

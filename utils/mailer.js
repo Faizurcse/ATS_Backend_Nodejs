@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import { getJobUpdateEmailTemplate, getJobDeleteEmailTemplate, getJobCreateEmailTemplate, getJobApplicationEmailTemplate, getNewApplicationNotificationTemplate, getPipelineStatusChangeRecruiterTemplate, getPipelineStatusChangeCandidateTemplate, getInterviewScheduledRecruiterTemplate, getInterviewScheduledCandidateTemplate } from './jobEmailTemplates.js';
 import { getTimesheetCreateEmailTemplate, getTimesheetUpdateEmailTemplate, getTimesheetDeleteEmailTemplate, getTimesheetApprovalEmailTemplate } from './timesheetEmailTemplates.js';
+import { getCustomerCreateEmailTemplate, getCustomerUpdateEmailTemplate, getCustomerDeleteEmailTemplate } from './customerEmailTemplates.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -286,5 +287,61 @@ const sendTimesheetApprovalEmail = async (email, timesheetData, approvalInfo) =>
   }
 };
 
-export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail, sendJobApplicationEmail, sendNewApplicationNotification, sendPipelineStatusChangeRecruiterEmail, sendPipelineStatusChangeCandidateEmail, sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail, sendTimesheetCreateEmail, sendTimesheetUpdateEmail, sendTimesheetDeleteEmail, sendTimesheetApprovalEmail };
+// Customer email functions
+const sendCustomerCreateEmail = async (email, customerData, createInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Welcome to Our Platform: ${customerData.companyName}`,
+      html: getCustomerCreateEmailTemplate(customerData, createInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Customer creation email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending customer creation email:', error);
+    throw error;
+  }
+};
+
+const sendCustomerUpdateEmail = async (email, customerData, updatedFields, updateInfo) => {
+  try {
+    const updatedFieldsText = updatedFields.length > 0 
+      ? ` - Updated: ${updatedFields.join(', ')}`
+      : '';
+    
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Account Update: ${customerData.companyName}${updatedFieldsText}`,
+      html: getCustomerUpdateEmailTemplate(customerData, updatedFields, updateInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Customer update email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending customer update email:', error);
+    throw error;
+  }
+};
+
+const sendCustomerDeleteEmail = async (email, customerData, deleteInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Account Deletion Confirmation: ${customerData.companyName}`,
+      html: getCustomerDeleteEmailTemplate(customerData, deleteInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Customer deletion email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending customer deletion email:', error);
+    throw error;
+  }
+};
+
+export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail, sendJobApplicationEmail, sendNewApplicationNotification, sendPipelineStatusChangeRecruiterEmail, sendPipelineStatusChangeCandidateEmail, sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail, sendTimesheetCreateEmail, sendTimesheetUpdateEmail, sendTimesheetDeleteEmail, sendTimesheetApprovalEmail, sendCustomerCreateEmail, sendCustomerUpdateEmail, sendCustomerDeleteEmail };
 export default sendOtpEmail;
