@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { getJobUpdateEmailTemplate, getJobDeleteEmailTemplate, getJobCreateEmailTemplate } from './jobEmailTemplates.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -40,4 +41,64 @@ const sendOtpEmail = async (email, otp) => {
   await transporter.sendMail(mailOptions);
 };
 
+// Function to send job creation notification email
+const sendJobCreateEmail = async (email, jobData, createInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `New Job Posting Created: ${jobData.title} at ${jobData.company}`,
+      html: getJobCreateEmailTemplate(jobData, createInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Job creation email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending job creation email:', error);
+    throw error;
+  }
+};
+
+// Function to send job update notification email
+const sendJobUpdateEmail = async (email, jobData, updatedFields, updateInfo) => {
+  try {
+    // Create subject line with updated fields
+    const updatedFieldsText = updatedFields.length > 0 
+      ? ` - Updated: ${updatedFields.join(', ')}`
+      : '';
+    
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Job Posting Updated: ${jobData.title} at ${jobData.company}${updatedFieldsText}`,
+      html: getJobUpdateEmailTemplate(jobData, updatedFields, updateInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Job update email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending job update email:', error);
+    throw error;
+  }
+};
+
+// Function to send job deletion notification email
+const sendJobDeleteEmail = async (email, jobData, deleteInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Job Posting Deleted: ${jobData.title} at ${jobData.company}`,
+      html: getJobDeleteEmailTemplate(jobData, deleteInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Job deletion email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending job deletion email:', error);
+    throw error;
+  }
+};
+
+export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail };
 export default sendOtpEmail;

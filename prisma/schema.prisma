@@ -75,6 +75,7 @@ model Ats_JobPost {
   department      String?
   internalSPOC    String
   recruiter       String?
+  email           String    // Contact email for job posting
   jobType         String   
   experienceLevel String?  
   country         String
@@ -86,9 +87,9 @@ model Ats_JobPost {
   salaryMax       Int
   priority        String?  
   description     String
-  requirements    String   
+  requirements    String  
   requiredSkills  String  
-  benefits        String   
+  benefits        String  
   createdAt       DateTime @default(now())
   
   // Relations

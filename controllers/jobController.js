@@ -1,4 +1,5 @@
 import prisma from '../prismaClient.js';
+import { sendJobUpdateEmail, sendJobDeleteEmail, sendJobCreateEmail } from '../utils/mailer.js';
 
 // Helper function to create SEO-friendly slug
 const createJobSlug = (job) => {
@@ -61,6 +62,7 @@ export const createJobPost = async (req, res) => {
     department,
     internalSPOC,
     recruiter,
+    email,
     jobType,
     experienceLevel,
     country,
@@ -78,6 +80,23 @@ export const createJobPost = async (req, res) => {
   } = req.body;
 
   try {
+    // Validate required fields
+    if (!email || !email.trim()) {
+      return res.status(400).json({ 
+        message: 'Email is required for job posting',
+        error: 'Please provide a valid email address'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        message: 'Invalid email format',
+        error: 'Please provide a valid email address'
+      });
+    }
+
     // Validate enum values
     validateEnumValues(workType, jobStatus);
 
@@ -89,6 +108,7 @@ export const createJobPost = async (req, res) => {
         department,
         internalSPOC,
         recruiter,
+        email,
         jobType,
         experienceLevel,
         country,
@@ -105,6 +125,22 @@ export const createJobPost = async (req, res) => {
         benefits,
       }
     });
+
+    // Send email notification for job creation
+    if (newJob.email) {
+      try {
+        const createInfo = {
+          createdBy: req.user?.name || req.user?.email || 'System Administrator',
+          createdAt: new Date(),
+          reason: req.body.createReason || 'New job posting created',
+          jobId: newJob.id
+        };
+        await sendJobCreateEmail(newJob.email, newJob, createInfo);
+      } catch (emailError) {
+        console.error('Failed to send creation email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
 
     res.status(201).json({
       message: 'Job post created successfully!',
@@ -137,6 +173,7 @@ export const updateJobPost = async (req, res) => {
     department,
     internalSPOC,
     recruiter,
+    email,
     jobType,
     experienceLevel,
     country,
@@ -154,6 +191,15 @@ export const updateJobPost = async (req, res) => {
   } = req.body;
 
   try {
+    // Get the original job data before update
+    const originalJob = await prisma.ats_JobPost.findUnique({
+      where: { id: jobId }
+    });
+
+    if (!originalJob) {
+      return res.status(404).json({ message: 'Job post not found' });
+    }
+
     // Validate enum values
     validateEnumValues(workType, jobStatus);
 
@@ -165,6 +211,7 @@ export const updateJobPost = async (req, res) => {
         department,
         internalSPOC,
         recruiter,
+        email,
         jobType,
         experienceLevel,
         country,
@@ -182,9 +229,56 @@ export const updateJobPost = async (req, res) => {
       }
     });
 
+    // Determine which fields were updated
+    const updatedFields = [];
+    const fieldsToCheck = [
+      { name: 'Title', original: originalJob.title, updated: title },
+      { name: 'Company', original: originalJob.company, updated: company },
+      { name: 'Department', original: originalJob.department, updated: department },
+      { name: 'Internal SPOC', original: originalJob.internalSPOC, updated: internalSPOC },
+      { name: 'Recruiter', original: originalJob.recruiter, updated: recruiter },
+      { name: 'Job Type', original: originalJob.jobType, updated: jobType },
+      { name: 'Experience Level', original: originalJob.experienceLevel, updated: experienceLevel },
+      { name: 'Country', original: originalJob.country, updated: country },
+      { name: 'City', original: originalJob.city, updated: city },
+      { name: 'Full Location', original: originalJob.fullLocation, updated: fullLocation },
+      { name: 'Work Type', original: originalJob.workType, updated: workType },
+      { name: 'Job Status', original: originalJob.jobStatus, updated: jobStatus },
+      { name: 'Salary Min', original: originalJob.salaryMin, updated: salaryMin },
+      { name: 'Salary Max', original: originalJob.salaryMax, updated: salaryMax },
+      { name: 'Priority', original: originalJob.priority, updated: priority },
+      { name: 'Description', original: originalJob.description, updated: description },
+      { name: 'Requirements', original: originalJob.requirements, updated: requirements },
+      { name: 'Required Skills', original: originalJob.requiredSkills, updated: requiredSkills },
+      { name: 'Benefits', original: originalJob.benefits, updated: benefits }
+    ];
+
+    fieldsToCheck.forEach(field => {
+      if (field.original !== field.updated && field.updated !== undefined) {
+        updatedFields.push(field.name);
+      }
+    });
+
+    // Send email notification if there are updates and email is provided
+    if (updatedFields.length > 0 && updatedJob.email) {
+      try {
+        const updateInfo = {
+          updatedBy: req.user?.name || req.user?.email || 'System Administrator',
+          updatedAt: new Date(),
+          reason: req.body.updateReason || 'Job posting information updated',
+          jobId: updatedJob.id
+        };
+        await sendJobUpdateEmail(updatedJob.email, updatedJob, updatedFields, updateInfo);
+      } catch (emailError) {
+        console.error('Failed to send update email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
     res.status(200).json({
       message: 'Job post updated successfully!',
-      job: updatedJob
+      job: updatedJob,
+      updatedFields: updatedFields
     });
   } catch (error) {
     res.status(500).json({ message: 'Error updating job post', error: error.message });
@@ -194,13 +288,68 @@ export const updateJobPost = async (req, res) => {
 export const deleteJobPost = async (req, res) => {
   const jobId = parseInt(req.params.id);
 
+  console.log('🚀 DELETE JOB REQUEST RECEIVED');
+  console.log('Job ID:', jobId);
+  console.log('Request User:', req.user);
+  console.log('Request Body:', req.body);
+
   try {
+    // Get the job data before deletion
+    const jobToDelete = await prisma.ats_JobPost.findUnique({
+      where: { id: jobId }
+    });
+
+    if (!jobToDelete) {
+      console.log('❌ Job not found in database');
+      return res.status(404).json({ message: 'Job post not found' });
+    }
+
+    console.log('✅ Job found in database:', jobToDelete.title);
+
+    // Delete the job post
     await prisma.ats_JobPost.delete({
       where: { id: jobId }
     });
 
+    console.log('✅ Job deleted from database');
+
+    // Send email notification if email is provided
+    console.log('🔍 Delete Email Debug:');
+    console.log('Job Email from DB:', jobToDelete.email);
+    console.log('Job Email from Request:', req.body.email);
+    console.log('Job Data:', jobToDelete);
+    
+    // Use email from request body as fallback if not in database
+    const emailToUse = jobToDelete.email || req.body.email;
+    
+    if (emailToUse) {
+      try {
+        const deleteInfo = {
+          deletedBy: req.user?.name || req.user?.email || 'System Administrator',
+          deletedAt: new Date(),
+          reason: req.body.deleteReason || 'Job posting removed from system',
+          jobId: jobToDelete.id
+        };
+        console.log('Delete Info:', deleteInfo);
+        console.log('Using email:', emailToUse);
+        await sendJobDeleteEmail(emailToUse, jobToDelete, deleteInfo);
+        console.log('✅ Delete email sent successfully!');
+      } catch (emailError) {
+        console.error('❌ Failed to send deletion email:', emailError);
+        console.error('Full error:', emailError);
+        // Don't fail the request if email fails
+      }
+    } else {
+      console.log('⚠️  No email found for job, skipping email notification');
+    }
+
     res.status(200).json({
-      message: 'Job post deleted successfully!'
+      message: 'Job post deleted successfully!',
+      deletedJob: {
+        id: jobToDelete.id,
+        title: jobToDelete.title,
+        company: jobToDelete.company
+      }
     });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting job post', error: error.message });
@@ -213,6 +362,15 @@ export const updateJobStatus = async (req, res) => {
   const { jobStatus } = req.body;
 
   try {
+    // Get the original job data before update
+    const originalJob = await prisma.ats_JobPost.findUnique({
+      where: { id: jobId }
+    });
+
+    if (!originalJob) {
+      return res.status(404).json({ message: 'Job post not found' });
+    }
+
     // Validate job status
     validateEnumValues(null, jobStatus);
 
@@ -223,9 +381,28 @@ export const updateJobStatus = async (req, res) => {
       }
     });
 
+    // Send email notification if status changed and email is provided
+    if (originalJob.jobStatus !== jobStatus.toUpperCase() && updatedJob.email) {
+      try {
+        const updatedFields = ['Job Status'];
+        const updateInfo = {
+          updatedBy: req.user?.name || req.user?.email || 'System Administrator',
+          updatedAt: new Date(),
+          reason: req.body.statusUpdateReason || `Job status changed from ${originalJob.jobStatus} to ${jobStatus.toUpperCase()}`,
+          jobId: updatedJob.id
+        };
+        await sendJobUpdateEmail(updatedJob.email, updatedJob, updatedFields, updateInfo);
+      } catch (emailError) {
+        console.error('Failed to send status update email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
     res.status(200).json({
       message: 'Job status updated successfully!',
-      job: updatedJob
+      job: updatedJob,
+      previousStatus: originalJob.jobStatus,
+      newStatus: jobStatus.toUpperCase()
     });
   } catch (error) {
     res.status(500).json({ message: 'Error updating job status', error: error.message });
