@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { getJobUpdateEmailTemplate, getJobDeleteEmailTemplate, getJobCreateEmailTemplate, getJobApplicationEmailTemplate, getNewApplicationNotificationTemplate, getPipelineStatusChangeRecruiterTemplate, getPipelineStatusChangeCandidateTemplate, getInterviewScheduledRecruiterTemplate, getInterviewScheduledCandidateTemplate } from './jobEmailTemplates.js';
 import { getTimesheetCreateEmailTemplate, getTimesheetUpdateEmailTemplate, getTimesheetDeleteEmailTemplate, getTimesheetApprovalEmailTemplate } from './timesheetEmailTemplates.js';
 import { getCustomerCreateEmailTemplate, getCustomerUpdateEmailTemplate, getCustomerDeleteEmailTemplate } from './customerEmailTemplates.js';
+import { getUserCreateEmailTemplate, getUserUpdateEmailTemplate, getUserDeleteEmailTemplate, getUserTypeChangeEmailTemplate } from './userEmailTemplates.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -343,5 +344,78 @@ const sendCustomerDeleteEmail = async (email, customerData, deleteInfo) => {
   }
 };
 
-export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail, sendJobApplicationEmail, sendNewApplicationNotification, sendPipelineStatusChangeRecruiterEmail, sendPipelineStatusChangeCandidateEmail, sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail, sendTimesheetCreateEmail, sendTimesheetUpdateEmail, sendTimesheetDeleteEmail, sendTimesheetApprovalEmail, sendCustomerCreateEmail, sendCustomerUpdateEmail, sendCustomerDeleteEmail };
+// User management email functions
+const sendUserCreateEmail = async (email, userData, createInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Welcome to Our Platform: ${userData.name}`,
+      html: getUserCreateEmailTemplate(userData, createInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`User creation email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending user creation email:', error);
+    throw error;
+  }
+};
+
+const sendUserUpdateEmail = async (email, userData, updatedFields, updateInfo) => {
+  try {
+    const updatedFieldsText = updatedFields.length > 0 
+      ? ` - Updated: ${updatedFields.join(', ')}`
+      : '';
+    
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Account Updated: ${userData.name}${updatedFieldsText}`,
+      html: getUserUpdateEmailTemplate(userData, updatedFields, updateInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`User update email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending user update email:', error);
+    throw error;
+  }
+};
+
+const sendUserDeleteEmail = async (email, userData, deleteInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Account Deletion Confirmation: ${userData.name}`,
+      html: getUserDeleteEmailTemplate(userData, deleteInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`User deletion email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending user deletion email:', error);
+    throw error;
+  }
+};
+
+const sendUserTypeChangeEmail = async (email, userData, oldUserType, newUserType, changeInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Role Update: ${userData.name} - ${oldUserType} → ${newUserType}`,
+      html: getUserTypeChangeEmailTemplate(userData, oldUserType, newUserType, changeInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`User type change email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending user type change email:', error);
+    throw error;
+  }
+};
+
+export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail, sendJobApplicationEmail, sendNewApplicationNotification, sendPipelineStatusChangeRecruiterEmail, sendPipelineStatusChangeCandidateEmail, sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail, sendTimesheetCreateEmail, sendTimesheetUpdateEmail, sendTimesheetDeleteEmail, sendTimesheetApprovalEmail, sendCustomerCreateEmail, sendCustomerUpdateEmail, sendCustomerDeleteEmail, sendUserCreateEmail, sendUserUpdateEmail, sendUserDeleteEmail, sendUserTypeChangeEmail };
 export default sendOtpEmail;

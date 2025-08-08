@@ -7,11 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserType {
+  ADMIN
+  MANAGER
+  USER
+}
+
 model Ats_User {
   id       Int         @id @default(autoincrement())
   name     String
   email    String      @unique
   number   String
+  userType UserType    @default(USER)
   logins   Ats_Login[] // relation to Ats_Login
 }
 
