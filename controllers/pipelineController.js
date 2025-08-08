@@ -1,9 +1,10 @@
 import prisma from '../prismaClient.js';
+import { sendPipelineStatusChangeRecruiterEmail, sendPipelineStatusChangeCandidateEmail } from '../utils/mailer.js';
 
 // Update candidate status for a specific job
 export const updateCandidateJobStatus = async (req, res) => {
   try {
-    const { candidateId, jobId, status } = req.body;
+    const { candidateId, jobId, status, reason } = req.body;
 
     // Validate required fields
     if (!candidateId || !jobId || !status) {
@@ -29,11 +30,31 @@ export const updateCandidateJobStatus = async (req, res) => {
       });
     }
 
-    // Check if the candidate application exists
+    // Check if the candidate application exists and get current status
     const existingApplication = await prisma.candidateApplication.findFirst({
       where: {
         id: parseInt(candidateId),
         jobId: parseInt(jobId)
+      },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: true,
+            city: true,
+            country: true,
+            jobType: true,
+            experienceLevel: true,
+            workType: true,
+            jobStatus: true,
+            salaryMin: true,
+            salaryMax: true,
+            email: true,
+            recruiter: true,
+            internalSPOC: true
+          }
+        }
       }
     });
 
@@ -43,6 +64,9 @@ export const updateCandidateJobStatus = async (req, res) => {
         message: 'Candidate application not found for the specified job'
       });
     }
+
+    const oldStatus = existingApplication.status;
+    const newStatus = status;
 
     // Update the candidate's status
     const updatedApplication = await prisma.candidateApplication.update({
@@ -55,14 +79,56 @@ export const updateCandidateJobStatus = async (req, res) => {
       }
     });
 
+    // Prepare change info for emails
+    const changeInfo = {
+      updatedBy: req.user?.name || 'System',
+      updatedAt: new Date(),
+      reason: reason || 'Status updated by recruitment team'
+    };
+
+    // Send emails to both parties
+    try {
+      // Send email to job poster/recruiter
+      if (existingApplication.job.email) {
+        await sendPipelineStatusChangeRecruiterEmail(
+          existingApplication.job.email,
+          existingApplication,
+          existingApplication.job,
+          oldStatus,
+          newStatus,
+          changeInfo
+        );
+      }
+
+      // Send email to candidate
+      await sendPipelineStatusChangeCandidateEmail(
+        existingApplication.email,
+        existingApplication,
+        existingApplication.job,
+        oldStatus,
+        newStatus,
+        changeInfo
+      );
+
+      console.log(`Pipeline status change emails sent successfully for candidate ${candidateId}`);
+    } catch (emailError) {
+      console.error('Error sending pipeline status change emails:', emailError);
+      // Don't fail the request if emails fail, just log the error
+    }
+
     res.status(200).json({
       success: true,
       message: `Candidate status updated to ${status} successfully`,
       data: {
         candidateId: parseInt(candidateId),
         jobId: parseInt(jobId),
+        oldStatus: oldStatus,
         newStatus: status,
-        updatedAt: updatedApplication.updatedAt
+        updatedAt: updatedApplication.updatedAt,
+        emailsSent: {
+          recruiter: existingApplication.job.email ? true : false,
+          candidate: true
+        }
       }
     });
 

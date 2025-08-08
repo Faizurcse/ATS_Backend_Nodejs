@@ -2,6 +2,7 @@ import prisma from '../prismaClient.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { sendJobApplicationEmail, sendNewApplicationNotification } from '../utils/mailer.js';
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
@@ -276,6 +277,30 @@ export const submitJobApplication = async (req, res) => {
         appliedAt: new Date()
       }
     });
+
+    // Send confirmation email to candidate
+    try {
+      await sendJobApplicationEmail(email, application, job);
+    } catch (emailError) {
+      console.error('Error sending application confirmation email:', emailError);
+      // Don't fail the application submission if email fails
+    }
+
+    // Send notification email to recruiters/HR
+    try {
+      // Send to job email if available
+      if (job.email) {
+        await sendNewApplicationNotification(job.email, application, job);
+      }
+      
+      // Send to internal SPOC if different from job email
+      if (job.internalSPOC && job.internalSPOC !== job.email) {
+        await sendNewApplicationNotification(job.internalSPOC, application, job);
+      }
+    } catch (notificationError) {
+      console.error('Error sending application notification email:', notificationError);
+      // Don't fail the application submission if notification email fails
+    }
 
     res.status(201).json({
       message: 'Application submitted successfully!',

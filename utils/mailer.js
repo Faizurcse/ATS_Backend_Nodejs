@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-import { getJobUpdateEmailTemplate, getJobDeleteEmailTemplate, getJobCreateEmailTemplate } from './jobEmailTemplates.js';
+import { getJobUpdateEmailTemplate, getJobDeleteEmailTemplate, getJobCreateEmailTemplate, getJobApplicationEmailTemplate, getNewApplicationNotificationTemplate, getPipelineStatusChangeRecruiterTemplate, getPipelineStatusChangeCandidateTemplate, getInterviewScheduledRecruiterTemplate, getInterviewScheduledCandidateTemplate } from './jobEmailTemplates.js';
+import { getTimesheetCreateEmailTemplate, getTimesheetUpdateEmailTemplate, getTimesheetDeleteEmailTemplate, getTimesheetApprovalEmailTemplate } from './timesheetEmailTemplates.js';
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
@@ -100,5 +101,190 @@ const sendJobDeleteEmail = async (email, jobData, deleteInfo) => {
   }
 };
 
-export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail };
+// Function to send job application confirmation email
+const sendJobApplicationEmail = async (email, applicationData, jobData) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Application Received: ${jobData.title} at ${jobData.company}`,
+      html: getJobApplicationEmailTemplate(applicationData, jobData),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Job application email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending job application email:', error);
+    throw error;
+  }
+};
+
+// Function to send new application notification email to recruiters/HR
+const sendNewApplicationNotification = async (email, applicationData, jobData) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `New Application: ${applicationData.firstName} ${applicationData.lastName} for ${jobData.title}`,
+      html: getNewApplicationNotificationTemplate(applicationData, jobData),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`New application notification email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending new application notification email:', error);
+    throw error;
+  }
+};
+
+// Function to send pipeline status change notification to recruiters/HR
+const sendPipelineStatusChangeRecruiterEmail = async (email, candidateData, jobData, oldStatus, newStatus, changeInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Pipeline Update: ${candidateData.firstName} ${candidateData.lastName} - ${oldStatus} → ${newStatus}`,
+      html: getPipelineStatusChangeRecruiterTemplate(candidateData, jobData, oldStatus, newStatus, changeInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Pipeline status change email sent successfully to recruiter ${email}`);
+  } catch (error) {
+    console.error('Error sending pipeline status change email to recruiter:', error);
+    throw error;
+  }
+};
+
+// Function to send pipeline status change notification to candidates
+const sendPipelineStatusChangeCandidateEmail = async (email, candidateData, jobData, oldStatus, newStatus, changeInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Application Status Update: ${jobData.title} at ${jobData.company}`,
+      html: getPipelineStatusChangeCandidateTemplate(candidateData, jobData, oldStatus, newStatus, changeInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Pipeline status change email sent successfully to candidate ${email}`);
+  } catch (error) {
+    console.error('Error sending pipeline status change email to candidate:', error);
+    throw error;
+  }
+};
+
+// Function to send interview scheduled notification to recruiters/HR
+const sendInterviewScheduledRecruiterEmail = async (email, interviewData, candidateData, jobData) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Interview Scheduled: ${candidateData.firstName} ${candidateData.lastName} for ${jobData.title}`,
+      html: getInterviewScheduledRecruiterTemplate(interviewData, candidateData, jobData),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Interview scheduled email sent successfully to recruiter ${email}`);
+  } catch (error) {
+    console.error('Error sending interview scheduled email to recruiter:', error);
+    throw error;
+  }
+};
+
+// Function to send interview scheduled notification to candidates
+const sendInterviewScheduledCandidateEmail = async (email, interviewData, candidateData, jobData) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Interview Scheduled: ${jobData.title} at ${jobData.company}`,
+      html: getInterviewScheduledCandidateTemplate(interviewData, candidateData, jobData),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Interview scheduled email sent successfully to candidate ${email}`);
+  } catch (error) {
+    console.error('Error sending interview scheduled email to candidate:', error);
+    throw error;
+  }
+};
+
+// Function to send timesheet creation notification email
+const sendTimesheetCreateEmail = async (email, timesheetData, createInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `New Timesheet Entry Created: ${timesheetData.recruiterName} - ${timesheetData.taskType}`,
+      html: getTimesheetCreateEmailTemplate(timesheetData, createInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Timesheet creation email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending timesheet creation email:', error);
+    throw error;
+  }
+};
+
+// Function to send timesheet update notification email
+const sendTimesheetUpdateEmail = async (email, timesheetData, updatedFields, updateInfo) => {
+  try {
+    // Create subject line with updated fields
+    const updatedFieldsText = updatedFields.length > 0 
+      ? ` - Updated: ${updatedFields.join(', ')}`
+      : '';
+    
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Timesheet Entry Updated: ${timesheetData.recruiterName} - ${timesheetData.taskType}${updatedFieldsText}`,
+      html: getTimesheetUpdateEmailTemplate(timesheetData, updatedFields, updateInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Timesheet update email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending timesheet update email:', error);
+    throw error;
+  }
+};
+
+// Function to send timesheet deletion notification email
+const sendTimesheetDeleteEmail = async (email, timesheetData, deleteInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Timesheet Entry Deleted: ${timesheetData.recruiterName} - ${timesheetData.taskType}`,
+      html: getTimesheetDeleteEmailTemplate(timesheetData, deleteInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Timesheet deletion email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending timesheet deletion email:', error);
+    throw error;
+  }
+};
+
+// Function to send timesheet approval notification email
+const sendTimesheetApprovalEmail = async (email, timesheetData, approvalInfo) => {
+  try {
+    const mailOptions = {
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: `Timesheet Entry Approved: ${timesheetData.recruiterName} - ${timesheetData.taskType}`,
+      html: getTimesheetApprovalEmailTemplate(timesheetData, approvalInfo),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Timesheet approval email sent successfully to ${email}`);
+  } catch (error) {
+    console.error('Error sending timesheet approval email:', error);
+    throw error;
+  }
+};
+
+export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail, sendJobApplicationEmail, sendNewApplicationNotification, sendPipelineStatusChangeRecruiterEmail, sendPipelineStatusChangeCandidateEmail, sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail, sendTimesheetCreateEmail, sendTimesheetUpdateEmail, sendTimesheetDeleteEmail, sendTimesheetApprovalEmail };
 export default sendOtpEmail;

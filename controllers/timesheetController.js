@@ -2,6 +2,7 @@ import prisma from '../prismaClient.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { sendTimesheetCreateEmail, sendTimesheetUpdateEmail, sendTimesheetDeleteEmail, sendTimesheetApprovalEmail } from '../utils/mailer.js';
 
 // GET - Get all timesheet entries
 const getTimesheetEntries = async (req, res) => {
@@ -94,6 +95,30 @@ const createTimesheetEntry = async (req, res) => {
       }
     });
     
+    // Send email notification for timesheet creation
+    try {
+      const createInfo = {
+        createdBy: req.body.createdBy || 'System',
+        createdAt: new Date(),
+        reason: req.body.creationReason || 'Timesheet entry created',
+        timesheetId: newEntry.id
+      };
+      
+      // Send email to recruiter if email is provided
+      if (recruiterEmail) {
+        await sendTimesheetCreateEmail(recruiterEmail, newEntry, createInfo);
+      }
+      
+      // Send email to admin/manager (you can configure this email)
+      const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_FROM_ADDRESS;
+      if (adminEmail && adminEmail !== recruiterEmail) {
+        await sendTimesheetCreateEmail(adminEmail, newEntry, createInfo);
+      }
+    } catch (emailError) {
+      console.error('Error sending timesheet creation email:', emailError);
+      // Don't fail the request if email fails
+    }
+    
     res.status(201).json({
       success: true,
       message: 'Timesheet entry created successfully',
@@ -178,6 +203,50 @@ const updateTimesheetEntry = async (req, res) => {
       data: updateData
     });
     
+    // Send email notification for timesheet update
+    try {
+      // Determine which fields were updated
+      const updatedFields = [];
+      if (recruiterName !== undefined && recruiterName !== existingEntry.recruiterName) updatedFields.push('Recruiter Name');
+      if (recruiterEmail !== undefined && recruiterEmail !== existingEntry.recruiterEmail) updatedFields.push('Recruiter Email');
+      if (date !== undefined && date !== existingEntry.date) updatedFields.push('Date');
+      if (startTime !== undefined && startTime !== existingEntry.startTime) updatedFields.push('Start Time');
+      if (endTime !== undefined && endTime !== existingEntry.endTime) updatedFields.push('End Time');
+      if (hours !== undefined && hours !== existingEntry.hours) updatedFields.push('Hours');
+      if (breakTime !== undefined && breakTime !== existingEntry.breakTime) updatedFields.push('Break Time');
+      if (entityType !== undefined && entityType !== existingEntry.entityType) updatedFields.push('Entity Type');
+      if (entityId !== undefined && entityId !== existingEntry.entityId) updatedFields.push('Entity ID');
+      if (entityName !== undefined && entityName !== existingEntry.entityName) updatedFields.push('Entity Name');
+      if (companyName !== undefined && companyName !== existingEntry.companyName) updatedFields.push('Company Name');
+      if (taskType !== undefined && taskType !== existingEntry.taskType) updatedFields.push('Task Type');
+      if (taskCategory !== undefined && taskCategory !== existingEntry.taskCategory) updatedFields.push('Task Category');
+      if (priority !== undefined && priority !== existingEntry.priority) updatedFields.push('Priority');
+      if (billable !== undefined && billable !== existingEntry.billable) updatedFields.push('Billable');
+      if (billableRate !== undefined && billableRate !== existingEntry.billableRate) updatedFields.push('Billable Rate');
+      if (comments !== undefined && comments !== existingEntry.comments) updatedFields.push('Comments');
+      
+      const updateInfo = {
+        updatedBy: req.body.updatedBy || 'System',
+        updatedAt: new Date(),
+        reason: req.body.updateReason || 'Timesheet entry updated',
+        timesheetId: updatedEntry.id
+      };
+      
+      // Send email to recruiter if email is provided
+      if (updatedEntry.recruiterEmail) {
+        await sendTimesheetUpdateEmail(updatedEntry.recruiterEmail, updatedEntry, updatedFields, updateInfo);
+      }
+      
+      // Send email to admin/manager (you can configure this email)
+      const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_FROM_ADDRESS;
+      if (adminEmail && adminEmail !== updatedEntry.recruiterEmail) {
+        await sendTimesheetUpdateEmail(adminEmail, updatedEntry, updatedFields, updateInfo);
+      }
+    } catch (emailError) {
+      console.error('Error sending timesheet update email:', emailError);
+      // Don't fail the request if email fails
+    }
+    
     res.status(200).json({
       success: true,
       message: 'Timesheet entry updated successfully',
@@ -208,6 +277,30 @@ const deleteTimesheetEntry = async (req, res) => {
         success: false,
         message: 'Timesheet entry not found'
       });
+    }
+    
+    // Send email notification for timesheet deletion before deleting
+    try {
+      const deleteInfo = {
+        deletedBy: req.body.deletedBy || 'System',
+        deletedAt: new Date(),
+        reason: req.body.deletionReason || 'Timesheet entry deleted',
+        timesheetId: existingEntry.id
+      };
+      
+      // Send email to recruiter if email is provided
+      if (existingEntry.recruiterEmail) {
+        await sendTimesheetDeleteEmail(existingEntry.recruiterEmail, existingEntry, deleteInfo);
+      }
+      
+      // Send email to admin/manager (you can configure this email)
+      const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_FROM_ADDRESS;
+      if (adminEmail && adminEmail !== existingEntry.recruiterEmail) {
+        await sendTimesheetDeleteEmail(adminEmail, existingEntry, deleteInfo);
+      }
+    } catch (emailError) {
+      console.error('Error sending timesheet deletion email:', emailError);
+      // Don't fail the request if email fails
     }
     
     await prisma.timesheetEntry.delete({
@@ -261,6 +354,29 @@ const approveTimesheetEntry = async (req, res) => {
         approvedAt: new Date()
       }
     });
+    
+    // Send email notification for timesheet approval
+    try {
+      const approvalInfo = {
+        approvedBy: approvedBy,
+        approvedAt: new Date(),
+        timesheetId: updatedEntry.id
+      };
+      
+      // Send email to recruiter if email is provided
+      if (updatedEntry.recruiterEmail) {
+        await sendTimesheetApprovalEmail(updatedEntry.recruiterEmail, updatedEntry, approvalInfo);
+      }
+      
+      // Send email to admin/manager (you can configure this email)
+      const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_FROM_ADDRESS;
+      if (adminEmail && adminEmail !== updatedEntry.recruiterEmail) {
+        await sendTimesheetApprovalEmail(adminEmail, updatedEntry, approvalInfo);
+      }
+    } catch (emailError) {
+      console.error('Error sending timesheet approval email:', emailError);
+      // Don't fail the request if email fails
+    }
     
     res.status(200).json({
       success: true,

@@ -1,4 +1,5 @@
 import prisma from '../prismaClient.js';
+import { sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail } from '../utils/mailer.js';
 
 /**
  * Get Candidates Selected for Interviews
@@ -137,13 +138,62 @@ export const scheduleInterview = async (req, res) => {
     });
 
     // Update candidate status to indicate interview is scheduled
-    await prisma.candidateApplication.update({
+    const oldStatus = 'Initial Screening'; // Default status before interview scheduling
+    const newStatus = 'Interview Scheduled';
+    
+    const updatedApplication = await prisma.candidateApplication.update({
       where: { id: parseInt(candidateId) },
       data: {
-        status: 'Interview Scheduled',
+        status: newStatus,
         updatedAt: new Date()
+      },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: true,
+            city: true,
+            country: true,
+            jobType: true,
+            experienceLevel: true,
+            workType: true,
+            jobStatus: true,
+            salaryMin: true,
+            salaryMax: true,
+            email: true,
+            recruiter: true,
+            internalSPOC: true
+          }
+        }
       }
     });
+
+    // Send email notifications for interview scheduling
+    try {
+      // Send email to job poster/recruiter
+      if (updatedApplication.job.email) {
+        await sendInterviewScheduledRecruiterEmail(
+          updatedApplication.job.email,
+          interviewSchedule,
+          updatedApplication,
+          updatedApplication.job
+        );
+      }
+
+      // Send email to candidate
+      await sendInterviewScheduledCandidateEmail(
+        updatedApplication.email,
+        interviewSchedule,
+        updatedApplication,
+        updatedApplication.job
+      );
+
+      console.log(`Interview scheduling emails sent successfully for candidate ${candidateId}`);
+    } catch (emailError) {
+      console.error('Error sending interview scheduling emails:', emailError);
+      // Don't fail the request if emails fail, just log the error
+    }
 
     res.status(201).json({
       success: true,
@@ -263,13 +313,78 @@ export const bulkScheduleInterviews = async (req, res) => {
           data: {
             status: 'Interview Scheduled',
             updatedAt: new Date()
+          },
+          include: {
+            job: {
+              select: {
+                id: true,
+                title: true,
+                company: true,
+                city: true,
+                country: true,
+                jobType: true,
+                experienceLevel: true,
+                workType: true,
+                jobStatus: true,
+                salaryMin: true,
+                salaryMax: true,
+                email: true,
+                recruiter: true,
+                internalSPOC: true
+              }
+            }
           }
         })
       );
     }
 
-    // Update all candidates
-    await Promise.all(updatePromises);
+    // Update all candidates and send emails
+    const updatedApplications = await Promise.all(updatePromises);
+
+    // Send email notifications for all status changes
+    const emailPromises = [];
+    const changeInfo = {
+      updatedBy: req.user?.name || 'System',
+      updatedAt: new Date(),
+      reason: 'Bulk interview scheduling by recruitment team'
+    };
+
+    for (const application of updatedApplications) {
+      // Send email to job poster/recruiter
+      if (application.job.email) {
+        emailPromises.push(
+          sendInterviewScheduledRecruiterEmail(
+            application.job.email,
+            interviewSchedules.find(s => s.candidateId === application.id),
+            application,
+            application.job
+          ).catch(error => {
+            console.error(`Error sending email to recruiter for candidate ${application.id}:`, error);
+          })
+        );
+      }
+
+      // Send email to candidate
+      emailPromises.push(
+        sendInterviewScheduledCandidateEmail(
+          application.email,
+          interviewSchedules.find(s => s.candidateId === application.id),
+          application,
+          application.job
+        ).catch(error => {
+          console.error(`Error sending email to candidate ${application.id}:`, error);
+        })
+      );
+    }
+
+    // Send all emails in parallel
+    try {
+      await Promise.all(emailPromises);
+      console.log(`Bulk interview scheduling emails sent successfully for ${updatedApplications.length} candidates`);
+    } catch (emailError) {
+      console.error('Error sending bulk interview scheduling emails:', emailError);
+      // Don't fail the request if emails fail, just log the error
+    }
 
     res.status(201).json({
       success: true,
