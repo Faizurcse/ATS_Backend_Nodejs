@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { sendJobApplicationEmail, sendNewApplicationNotification } from '../utils/mailer.js';
+import { PRODUCTION_BASE_URL } from '../productionApi.js';
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
@@ -125,7 +126,7 @@ export const getJobForApplication = async (req, res) => {
 
     res.status(200).json({
       job,
-      applicationUrl: `${process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`}/api/job-listings/${slug}/apply`
+      applicationUrl: `${PRODUCTION_BASE_URL}/api/job-listings/${slug}/apply`
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching job details', error: error.message });
@@ -435,7 +436,7 @@ export const getAllCandidates = async (req, res) => {
       updatedAt: candidate.updatedAt,
       // Generate resume download URL if resume exists
       resumeDownloadUrl: candidate.resumeFilePath ? 
-        `${process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`}/api/candidates/${candidate.id}/resume` : null,
+        `${PRODUCTION_BASE_URL}/api/candidates/${candidate.id}/resume` : null,
       appliedJobs: [candidate.job]
     }));
 
@@ -528,7 +529,7 @@ export const getCandidateById = async (req, res) => {
       updatedAt: candidate.updatedAt,
       // Generate resume download URL if resume exists
       resumeDownloadUrl: candidate.resumeFilePath ? 
-        `${process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`}/api/candidates/${candidate.id}/resume` : null,
+        `${PRODUCTION_BASE_URL}/api/candidates/${candidate.id}/resume` : null,
       totalApplications: allApplications.length,
       // Map all applications with their status and job details
       appliedJobs: allApplications.map(app => ({
@@ -698,7 +699,7 @@ export const getAllCandidatesComplete = async (req, res) => {
           appliedAt: application.appliedAt,
           updatedAt: application.updatedAt,
           resumeDownloadUrl: application.resumeFilePath ? 
-            `${process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`}/api/candidates/${application.id}/resume` : null,
+            `${PRODUCTION_BASE_URL}/api/candidates/${application.id}/resume` : null,
           totalApplications: 0,
           appliedJobs: []
         };

@@ -1,5 +1,6 @@
 import prisma from '../prismaClient.js';
 import { sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail } from '../utils/mailer.js';
+import { PRODUCTION_BASE_URL } from '../productionApi.js';
 
 /**
  * Get Candidates Selected for Interviews
@@ -494,7 +495,7 @@ export const getAllInterviewScheduledCandidates = async (req, res) => {
         candidateStatus: candidate.status,
         appliedAt: candidate.appliedAt,
         updatedAt: candidate.updatedAt,
-        resumeDownloadUrl: `http://localhost:5000/api/candidates/${candidate.id}/resume`,
+        resumeDownloadUrl: `${PRODUCTION_BASE_URL}/api/candidates/${candidate.id}/resume`,
 
         // Job Details
         job: {
