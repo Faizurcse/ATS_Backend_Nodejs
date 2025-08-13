@@ -7,18 +7,14 @@ import { sendJobApplicationEmail, sendNewApplicationNotification } from '../util
 // Configure multer for file upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Get candidate name from form data
-    const firstName = req.body.firstName || 'candidate';
-    const lastName = req.body.lastName || 'user';
-    
     // Create uploads directory if it doesn't exist
     const uploadDir = './uploads';
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     
-    // Create candidate-specific folder
-    const candidateFolder = `${uploadDir}/${firstName}_${lastName}`;
+    // Use consistent candidate_user folder for all resumes
+    const candidateFolder = `${uploadDir}/candidate_user`;
     if (!fs.existsSync(candidateFolder)) {
       fs.mkdirSync(candidateFolder, { recursive: true });
     }
@@ -26,9 +22,7 @@ const storage = multer.diskStorage({
     cb(null, candidateFolder);
   },
   filename: function (req, file, cb) {
-    // Create filename with candidate name and timestamp
-    const firstName = req.body.firstName || 'candidate';
-    const lastName = req.body.lastName || 'user';
+    // Create filename with timestamp only for consistency
     const timestamp = Date.now();
     const fileExtension = path.extname(file.originalname);
     const fileName = `resume_${timestamp}${fileExtension}`;
@@ -581,13 +575,27 @@ export const downloadResume = async (req, res) => {
       return res.status(404).json({ message: 'Resume not found for this candidate' });
     }
 
+    // Normalize the file path to handle both relative and absolute paths
+    let filePath = candidate.resumeFilePath;
+    
+    // If the path doesn't start with ./uploads, assume it's relative to uploads/candidate_user
+    if (!filePath.startsWith('./uploads/')) {
+      filePath = `./uploads/candidate_user/${path.basename(filePath)}`;
+    }
+
     // Verify the file exists on the filesystem
-    if (!fs.existsSync(candidate.resumeFilePath)) {
-      return res.status(404).json({ message: 'Resume file not found on server' });
+    if (!fs.existsSync(filePath)) {
+      console.error(`Resume file not found: ${filePath}`);
+      console.error(`Original path from DB: ${candidate.resumeFilePath}`);
+      return res.status(404).json({ 
+        message: 'Resume file not found on server',
+        originalPath: candidate.resumeFilePath,
+        resolvedPath: filePath
+      });
     }
 
     // Determine content type based on file extension
-    const fileExtension = path.extname(candidate.resumeFilePath).toLowerCase();
+    const fileExtension = path.extname(filePath).toLowerCase();
     let contentType = 'application/octet-stream';
     
     // Set appropriate content type for different file formats
@@ -615,13 +623,14 @@ export const downloadResume = async (req, res) => {
     
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Content-Length', fs.statSync(candidate.resumeFilePath).size);
+    res.setHeader('Content-Length', fs.statSync(filePath).size);
 
     // Stream the file for efficient memory usage
-    const fileStream = fs.createReadStream(candidate.resumeFilePath);
+    const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
 
   } catch (error) {
+    console.error('Error downloading resume:', error);
     res.status(500).json({ message: 'Error downloading resume', error: error.message });
   }
 };
@@ -728,4 +737,24 @@ export const getAllCandidatesComplete = async (req, res) => {
       error: error.message 
     });
   }
+}; 
+
+// Utility function to normalize resume file paths
+export const normalizeResumePath = (filePath) => {
+  if (!filePath) return null;
+  
+  // If the path doesn't start with ./uploads, assume it's relative to uploads/candidate_user
+  if (!filePath.startsWith('./uploads/')) {
+    return `./uploads/candidate_user/${path.basename(filePath)}`;
+  }
+  
+  return filePath;
+};
+
+// Utility function to check if resume file exists
+export const checkResumeExists = (filePath) => {
+  if (!filePath) return false;
+  
+  const normalizedPath = normalizeResumePath(filePath);
+  return fs.existsSync(normalizedPath);
 }; 
