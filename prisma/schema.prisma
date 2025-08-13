@@ -7,59 +7,151 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserType {
-  ADMIN
-  MANAGER
-  USER
-}
-
 model Ats_User {
   id       Int         @id @default(autoincrement())
   name     String
   email    String      @unique
   number   String
   userType UserType    @default(USER)
-  logins   Ats_Login[] // relation to Ats_Login
+  logins   Ats_Login[]
 }
 
 model Ats_Login {
-  id        Int        @id @default(autoincrement())
-  userId    Int
-  loggedAt  DateTime   @default(now())
-
-  user      Ats_User   @relation(fields: [userId], references: [id])
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  loggedAt DateTime @default(now())
+  user     Ats_User @relation(fields: [userId], references: [id])
 }
 
-// Customer Management Model - Simplified
 model Customer {
-  id                Int      @id @default(autoincrement())
-  companyName       String
-  industry          String
-  companySize       String?  // Small, Medium, Large, Enterprise
-  website           String?
-  description       String?
-  email             String?  // Contact email for customer
-  
-  // Status and Priority
-  status            CustomerStatus @default(ACTIVE)
-  priority          CustomerPriority @default(MEDIUM)
-  
-  // Location
-  country           String
-  city              String
-  address           String?
-  
-  // Financial Information
-  annualRevenue     String?
-  contractValue     Decimal? @db.Decimal(10, 2)
-  billingCycle      String?  // Monthly, Quarterly, Annual
-  
-  // Timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id            Int              @id @default(autoincrement())
+  companyName   String
+  industry      String
+  companySize   String?
+  website       String?
+  description   String?
+  email         String?
+  status        CustomerStatus   @default(ACTIVE)
+  priority      CustomerPriority @default(MEDIUM)
+  country       String
+  city          String
+  address       String?
+  annualRevenue String?
+  contractValue Decimal?         @db.Decimal(10, 2)
+  billingCycle  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  jobs          Ats_JobPost[]
+}
+
+model Ats_JobPost {
+  id              Int                    @id @default(autoincrement())
+  title           String
+  company         String
+  department      String?
+  internalSPOC    String
+  recruiter       String?
+  email           String
+  jobType         String
+  experienceLevel String?
+  country         String
+  city            String
+  fullLocation    String
+  workType        WorkType               @default(ONSITE)
+  jobStatus       JobStatus              @default(ACTIVE)
+  salaryMin       Int
+  salaryMax       Int
+  priority        String?
+  description     String
+  requirements    String
+  requiredSkills  String
+  benefits        String
+  createdAt       DateTime               @default(now())
+  customerId      Int?
+  customer        Customer?              @relation(fields: [customerId], references: [id])
+  applications    CandidateApplication[]
+  timesheetEntries TimesheetEntry[]
+}
+
+model CandidateApplication {
+  id                 Int                 @id @default(autoincrement())
+  jobId              Int
+  firstName          String
+  lastName           String
+  email              String
+  phone              String
+  currentLocation    String?
+  resumeFilePath     String?
+  coverLetter        String?
+  keySkills          String?
+  salaryExpectation  Int?
+  noticePeriod       String?
+  yearsOfExperience  String?
+  remoteWork         Boolean?
+  startDate          String?
+  portfolioUrl       String?
+  status             String              @default("pending")
+  appliedAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  jobDeleted         Boolean             @default(false)
+  job                Ats_JobPost         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  interviewSchedules InterviewSchedule[]
+}
+
+model InterviewSchedule {
+  id            Int                  @id @default(autoincrement())
+  candidateId   Int
+  candidateName String
+  interviewDate DateTime
+  interviewTime String
+  interviewType String
+  interviewMode String
+  platform      String?
+  meetingLink   String?
+  interviewer   String?
+  notes         String?
+  status        String               @default("SCHEDULED")
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  candidate     CandidateApplication @relation(fields: [candidateId], references: [id])
+}
+
+model TimesheetEntry {
+  id             Int             @id @default(autoincrement())
+  recruiterId    String?
+  date           String
+  hours          Decimal         @db.Decimal(4, 2)
+  entityType     EntityType
+  entityId       String?
+  jobId          Int?            // Foreign key to job when entityType is JOB
+  taskType       String
+  comments       String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  approvedAt     DateTime?
+  approvedBy     String?
+  attachments    String?
+  billable       Boolean         @default(true)
+  billableRate   Decimal?        @db.Decimal(8, 2)
+  breakTime      Decimal?        @db.Decimal(3, 2)
+  companyName    String?
+  endTime        String?
+  entityName     String?
+  priority       Priority        @default(MEDIUM)
+  recruiterEmail String?
+  recruiterName  String
+  startTime      String?
+  status         TimesheetStatus @default(PENDING)
+  taskCategory   TaskCategory    @default(RECRUITMENT)
   
   // Relations
-  jobs              Ats_JobPost[]
+  job            Ats_JobPost?    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+enum UserType {
+  ADMIN
+  MANAGER
+  USER
 }
 
 enum CustomerStatus {
@@ -76,36 +168,6 @@ enum CustomerPriority {
   CRITICAL
 }
 
-model Ats_JobPost {
-  id              Int      @id @default(autoincrement())
-  title           String   
-  company         String
-  department      String?
-  internalSPOC    String
-  recruiter       String?
-  email           String    // Contact email for job posting
-  jobType         String   
-  experienceLevel String?  
-  country         String
-  city            String
-  fullLocation    String
-  workType        WorkType @default(ONSITE)
-  jobStatus       JobStatus @default(ACTIVE)
-  salaryMin       Int
-  salaryMax       Int
-  priority        String?  
-  description     String
-  requirements    String  
-  requiredSkills  String  
-  benefits        String  
-  createdAt       DateTime @default(now())
-  
-  // Relations
-  applications    CandidateApplication[]
-  customer       Customer? @relation(fields: [customerId], references: [id])
-  customerId     Int?
-}
-
 enum WorkType {
   ONSITE
   REMOTE
@@ -117,103 +179,6 @@ enum JobStatus {
   PAUSED
   CLOSED
   FILLED
-}
-
-model CandidateApplication {
-  id                    Int      @id @default(autoincrement())
-  jobId                 Int
-  
-  // Personal Information
-  firstName             String
-  lastName              String
-  email                 String
-  phone                 String
-  currentLocation       String?
-  
-  // Resume & Cover Letter
-  resumeFilePath        String?  // File path in uploads folder
-  coverLetter           String?
-  
-  // Additional Questions
-  keySkills             String?  // Q1. Key skills relevant to position
-  salaryExpectation     Int?     // Q3. Current salary expectation
-  noticePeriod          String?  // Q4. Notice period
-  yearsOfExperience     String?  // Q5. Years of experience
-  remoteWork            Boolean? // Q6. Open to remote work
-  startDate             String?  // Q7. When can you start
-  portfolioUrl          String?  // Q8. Portfolio or GitHub link
-  
-  // Application Status
-  status                String   @default("pending") // pending, shortlisted, rejected, hired
-  appliedAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
-  // Relation to job
-  job                   Ats_JobPost @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  
-  // Relation to interview schedules
-  interviewSchedules     InterviewSchedule[]
-}
-
-model InterviewSchedule {
-  id              Int      @id @default(autoincrement())
-  candidateId     Int
-  candidateName   String
-  interviewDate   DateTime
-  interviewTime   String
-  interviewType   String   // Technical, HR, Behavioral, Panel, Final
-  interviewMode   String   // Online, Onsite, Phone, Hybrid
-  platform        String?  // Zoom, Google Meet, Teams, etc.
-  meetingLink     String?
-  interviewer     String?
-  notes           String?
-  status          String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED, RESCHEDULED
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  // Relation to candidate application
-  candidate       CandidateApplication @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-}
-
-// Timesheet Management Models
-model TimesheetEntry {
-  id              Int      @id @default(autoincrement())
-  
-  // Recruiter Information
-  recruiterId     String?  // Recruiter identifier
-  recruiterName   String   // Name of the recruiter
-  recruiterEmail  String?  // Email of the recruiter
-  
-  // Time Tracking
-  date            String   // Date in YYYY-MM-DD format
-  startTime       String?  // Start time in HH:MM format
-  endTime         String?  // End time in HH:MM format
-  hours           Decimal  @db.Decimal(4, 2) // Up to 99.99 hours
-  breakTime       Decimal? @db.Decimal(3, 2) // Break time in hours (0.00 to 9.99)
-  
-  // Entity Information
-  entityType      EntityType
-  entityId        String?  // ID of related entity (customer, job, candidate)
-  entityName      String?  // Name of the related entity
-  companyName     String?  // Company name (for jobs and candidates)
-  
-  // Task Details
-  taskType        String   // Task type like "Candidate Sourcing", "Client Meeting", etc.
-  taskCategory    TaskCategory @default(RECRUITMENT)
-  priority        Priority @default(MEDIUM)
-  status          TimesheetStatus @default(PENDING)
-  
-  // Additional Information
-  billable        Boolean  @default(true)
-  billableRate    Decimal? @db.Decimal(8, 2) // Hourly rate for billing
-  comments        String?  // Optional comments
-  attachments     String?  // Comma-separated file paths
-  
-  // Timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  approvedAt      DateTime? // When timesheet was approved
-  approvedBy      String?   // ID of the person who approved
 }
 
 enum EntityType {
