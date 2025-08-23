@@ -30,7 +30,6 @@ model Customer {
   companySize   String?
   website       String?
   description   String?
-  email         String?
   status        CustomerStatus   @default(ACTIVE)
   priority      CustomerPriority @default(MEDIUM)
   country       String
@@ -51,14 +50,11 @@ model Ats_JobPost {
   department      String?
   internalSPOC    String
   recruiter       String?
-  email           String
   jobType         String
   experienceLevel String?
   country         String
   city            String
   fullLocation    String
-  workType        WorkType               @default(ONSITE)
-  jobStatus       JobStatus              @default(ACTIVE)
   salaryMin       Int
   salaryMax       Int
   priority        String?
@@ -67,33 +63,34 @@ model Ats_JobPost {
   requiredSkills  String
   benefits        String
   createdAt       DateTime               @default(now())
+  jobStatus       JobStatus              @default(ACTIVE)
+  workType        WorkType               @default(ONSITE)
   customerId      Int?
+  email           String
   customer        Customer?              @relation(fields: [customerId], references: [id])
   applications    CandidateApplication[]
-  timesheetEntries TimesheetEntry[]
 }
 
 model CandidateApplication {
   id                 Int                 @id @default(autoincrement())
   jobId              Int
-  firstName          String
-  lastName           String
   email              String
   phone              String
-  currentLocation    String?
-  resumeFilePath     String?
   coverLetter        String?
-  keySkills          String?
-  salaryExpectation  Int?
-  noticePeriod       String?
-  yearsOfExperience  String?
-  remoteWork         Boolean?
-  startDate          String?
   portfolioUrl       String?
   status             String              @default("pending")
   appliedAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
-  jobDeleted         Boolean             @default(false)
+  currentLocation    String?
+  firstName          String
+  keySkills          String?
+  lastName           String
+  noticePeriod       String?
+  remoteWork         Boolean?
+  resumeFilePath     String?
+  salaryExpectation  Int?
+  startDate          String?
+  yearsOfExperience  String?
   job                Ats_JobPost         @relation(fields: [jobId], references: [id], onDelete: Cascade)
   interviewSchedules InterviewSchedule[]
 }
@@ -113,17 +110,14 @@ model InterviewSchedule {
   status        String               @default("SCHEDULED")
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
-  candidate     CandidateApplication @relation(fields: [candidateId], references: [id])
+  candidate     CandidateApplication @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 }
 
 model TimesheetEntry {
   id             Int             @id @default(autoincrement())
-  recruiterId    String?
   date           String
   hours          Decimal         @db.Decimal(4, 2)
   entityType     EntityType
-  entityId       String?
-  jobId          Int?            // Foreign key to job when entityType is JOB
   taskType       String
   comments       String?
   createdAt      DateTime        @default(now())
@@ -136,22 +130,15 @@ model TimesheetEntry {
   breakTime      Decimal?        @db.Decimal(3, 2)
   companyName    String?
   endTime        String?
-  entityName     String?
   priority       Priority        @default(MEDIUM)
   recruiterEmail String?
   recruiterName  String
   startTime      String?
   status         TimesheetStatus @default(PENDING)
   taskCategory   TaskCategory    @default(RECRUITMENT)
-  
-  // Relations
-  job            Ats_JobPost?    @relation(fields: [jobId], references: [id], onDelete: Cascade)
-}
-
-enum UserType {
-  ADMIN
-  MANAGER
-  USER
+  entityId       String?
+  entityName     String?
+  recruiterId    String?
 }
 
 enum CustomerStatus {
@@ -210,4 +197,10 @@ enum TimesheetStatus {
   APPROVED
   REJECTED
   SUBMITTED
+}
+
+enum UserType {
+  ADMIN
+  MANAGER
+  USER
 }
