@@ -38,37 +38,38 @@ model Customer {
   annualRevenue String?
   contractValue Decimal?         @db.Decimal(10, 2)
   billingCycle  String?
+  email         String?          // Added email field for customer contact
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   jobs          Ats_JobPost[]
 }
 
 model Ats_JobPost {
-  id              Int                    @id @default(autoincrement())
-  title           String
-  company         String
-  department      String?
-  internalSPOC    String
-  recruiter       String?
-  email           String
-  jobType         String
-  experienceLevel String?
-  country         String
-  city            String
-  fullLocation    String
-  workType        WorkType               @default(ONSITE)
-  jobStatus       JobStatus              @default(ACTIVE)
-  salaryMin       Int
-  salaryMax       Int
-  priority        String?
-  description     String
-  requirements    String
-  requiredSkills  String
-  benefits        String
-  createdAt       DateTime               @default(now())
-  customerId      Int?
-  customer        Customer?              @relation(fields: [customerId], references: [id])
-  applications    CandidateApplication[]
+  id               Int                    @id @default(autoincrement())
+  title            String
+  company          String
+  department       String?
+  internalSPOC     String
+  recruiter        String?
+  jobType          String
+  experienceLevel  String?
+  country          String
+  city             String
+  fullLocation     String
+  salaryMin        Int
+  salaryMax        Int
+  priority         String?
+  description      String
+  requirements     String
+  requiredSkills   String
+  benefits         String
+  createdAt        DateTime               @default(now())
+  jobStatus        JobStatus              @default(ACTIVE)
+  workType         WorkType               @default(ONSITE)
+  customerId       Int?
+  email            String
+  customer         Customer?              @relation(fields: [customerId], references: [id])
+  applications     CandidateApplication[]
   timesheetEntries TimesheetEntry[]
 }
 
@@ -117,12 +118,9 @@ model InterviewSchedule {
 
 model TimesheetEntry {
   id             Int             @id @default(autoincrement())
-  recruiterId    String?
   date           String
   hours          Decimal         @db.Decimal(4, 2)
   entityType     EntityType
-  entityId       String?
-  jobId          Int?            // Foreign key to job when entityType is JOB
   taskType       String
   comments       String?
   createdAt      DateTime        @default(now())
@@ -135,16 +133,51 @@ model TimesheetEntry {
   breakTime      Decimal?        @db.Decimal(3, 2)
   companyName    String?
   endTime        String?
-  entityName     String?
   priority       Priority        @default(MEDIUM)
   recruiterEmail String?
   recruiterName  String
   startTime      String?
   status         TimesheetStatus @default(PENDING)
   taskCategory   TaskCategory    @default(RECRUITMENT)
-  
-  // Relations
+  entityId       String?
+  entityName     String?
+  recruiterId    String?
+  jobId          Int?
   job            Ats_JobPost?    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model resume_data {
+  id                Int                @id @default(autoincrement())
+  filename          String             @db.VarChar(255)
+  file_path         String             @db.VarChar(500)
+  file_type         String             @db.VarChar(50)
+  file_size         Int
+  processing_time   Float
+  parsed_data       Json
+  candidate_name    String?            @db.VarChar(255)
+  candidate_email   String?            @db.VarChar(255)
+  candidate_phone   String?            @db.VarChar(100)
+  total_experience  String?            @db.VarChar(100)
+  is_unique         Boolean?           @default(true)
+  created_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?          @default(now()) @db.Timestamptz(6)
+  resume_embeddings resume_embeddings?
+
+  @@index([candidate_email], map: "idx_resume_data_candidate_email")
+  @@index([candidate_name], map: "idx_resume_data_candidate_name")
+  @@index([filename], map: "idx_resume_data_filename")
+  @@index([is_unique], map: "idx_resume_data_is_unique")
+}
+
+model resume_embeddings {
+  id          Int         @id @default(autoincrement())
+  resume_id   Int         @unique
+  embedding   Json
+  created_at  DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?   @default(now()) @db.Timestamptz(6)
+  resume_data resume_data @relation(fields: [resume_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([resume_id], map: "idx_resume_embeddings_resume_id")
 }
 
 enum CustomerStatus {
