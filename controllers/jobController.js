@@ -55,6 +55,8 @@ const validateEnumValues = (workType, jobStatus) => {
   }
 };
 
+
+
 export const createJobPost = async (req, res) => {
   const {
     title,
@@ -100,6 +102,9 @@ export const createJobPost = async (req, res) => {
     // Validate enum values
     validateEnumValues(workType, jobStatus);
 
+    // Create fullLocation if not provided
+    const finalFullLocation = fullLocation || (city && country ? `${city}, ${country}` : city || country || '');
+
     // Create a new job post in the database
     const newJob = await prisma.ats_JobPost.create({
       data: {
@@ -113,7 +118,7 @@ export const createJobPost = async (req, res) => {
         experienceLevel,
         country,
         city,
-        fullLocation,
+        fullLocation: finalFullLocation,
         workType: workType ? workType.toUpperCase() : 'ONSITE',
         jobStatus: jobStatus ? jobStatus.toUpperCase() : 'ACTIVE',
         salaryMin,
@@ -142,6 +147,8 @@ export const createJobPost = async (req, res) => {
       }
     }
 
+
+
     res.status(201).json({
       message: 'Job post created successfully!',
       job: newJob
@@ -153,7 +160,34 @@ export const createJobPost = async (req, res) => {
 
 export const getJobPosts = async (req, res) => {
   try {
-    const jobs = await prisma.ats_JobPost.findMany();
+    const jobs = await prisma.ats_JobPost.findMany({
+      select: {
+        id: true,
+        title: true,
+        company: true,
+        department: true,
+        internalSPOC: true,
+        recruiter: true,
+        jobType: true,
+        experienceLevel: true,
+        country: true,
+        city: true,
+        fullLocation: true,
+        salaryMin: true,
+        salaryMax: true,
+        priority: true,
+        description: true,
+        requirements: true,
+        requiredSkills: true,
+        benefits: true,
+        createdAt: true,
+        jobStatus: true,
+        workType: true,
+        customerId: true,
+        email: true
+        // embedding field is excluded to improve API performance
+      }
+    });
     const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
     const jobsWithUrl = jobs.map(job => ({
       ...job,
@@ -203,6 +237,9 @@ export const updateJobPost = async (req, res) => {
     // Validate enum values
     validateEnumValues(workType, jobStatus);
 
+    // Create fullLocation if not provided
+    const finalFullLocation = fullLocation || (city && country ? `${city}, ${country}` : city || country || '');
+
     const updatedJob = await prisma.ats_JobPost.update({
       where: { id: jobId },
       data: {
@@ -216,7 +253,7 @@ export const updateJobPost = async (req, res) => {
         experienceLevel,
         country,
         city,
-        fullLocation,
+        fullLocation: finalFullLocation,
         workType: workType ? workType.toUpperCase() : undefined,
         jobStatus: jobStatus ? jobStatus.toUpperCase() : undefined,
         salaryMin,
@@ -274,6 +311,8 @@ export const updateJobPost = async (req, res) => {
         // Don't fail the request if email fails
       }
     }
+
+
 
     res.status(200).json({
       message: 'Job post updated successfully!',
@@ -420,6 +459,32 @@ export const getJobsByStatus = async (req, res) => {
     const jobs = await prisma.ats_JobPost.findMany({
       where: {
         jobStatus: status.toUpperCase()
+      },
+      select: {
+        id: true,
+        title: true,
+        company: true,
+        department: true,
+        internalSPOC: true,
+        recruiter: true,
+        jobType: true,
+        experienceLevel: true,
+        country: true,
+        city: true,
+        fullLocation: true,
+        salaryMin: true,
+        salaryMax: true,
+        priority: true,
+        description: true,
+        requirements: true,
+        requiredSkills: true,
+        benefits: true,
+        createdAt: true,
+        jobStatus: true,
+        workType: true,
+        customerId: true,
+        email: true
+        // embedding field is excluded to improve API performance
       }
     });
 

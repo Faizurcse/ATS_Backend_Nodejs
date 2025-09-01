@@ -1,17 +1,40 @@
 import prisma from '../prismaClient.js';
-import sendOtpEmail, { sendUserCreateEmail, sendUserUpdateEmail, sendUserDeleteEmail, sendUserTypeChangeEmail } from "../utils/mailer.js";
+import sendOtpEmail, { sendUserCreateEmail, sendUserUpdateEmail, sendUserDeleteEmail, sendUserTypeChangeEmail, isEmailServiceAvailable } from "../utils/mailer.js";
 import { generateOtp, storeOtp, validateOtp } from "../middlewares/validateOtp.js";
 
 export const sendOtp = async (req, res) => {
-  const { email } = req.body;
-  const user = await prisma.ats_User.findUnique({ where: { email } });
-  if (!user) return res.status(404).json({ error: "User not found" });
+  try {
+    const { email } = req.body;
+    
+    // Check if email service is available
+    if (!isEmailServiceAvailable()) {
+      return res.status(503).json({ 
+        error: "Email service is currently unavailable. Please contact support or try again later.",
+        details: "Email configuration is missing or invalid. Please check server configuration."
+      });
+    }
 
-  const otp = generateOtp();
-  storeOtp(email, otp);
-  await sendOtpEmail(email, otp);
+    const user = await prisma.ats_User.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-  res.json({ message: "OTP sent" });
+    const otp = generateOtp();
+    storeOtp(email, otp);
+    
+    try {
+      await sendOtpEmail(email, otp);
+      res.json({ message: "OTP sent successfully" });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError.message);
+      res.status(500).json({ 
+        error: "Failed to send OTP email",
+        details: emailError.message,
+        suggestion: "Please check your email address and try again, or contact support if the issue persists."
+      });
+    }
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 export const verifyOtp = async (req, res) => {

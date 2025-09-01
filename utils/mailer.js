@@ -6,18 +6,81 @@ import { getCustomerCreateEmailTemplate, getCustomerUpdateEmailTemplate, getCust
 import { getUserCreateEmailTemplate, getUserUpdateEmailTemplate, getUserDeleteEmailTemplate, getUserTypeChangeEmailTemplate } from './userEmailTemplates.js';
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST,
-  port: process.env.MAIL_PORT,
-  secure: false,
-  auth: {
-    user: process.env.MAIL_USERNAME,
-    pass: process.env.MAIL_PASSWORD,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
+// Validate email configuration
+const validateEmailConfig = () => {
+  const requiredVars = ['MAIL_HOST', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD', 'MAIL_FROM_NAME', 'MAIL_FROM_ADDRESS'];
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    console.error('❌ Missing email configuration variables:', missingVars.join(', '));
+    console.error('Please create a .env file with the following variables:');
+    console.error(`
+# Email Configuration
+MAIL_HOST="smtp.gmail.com"
+MAIL_PORT=587
+MAIL_USERNAME="your-email@gmail.com"
+MAIL_PASSWORD="your-app-password"
+MAIL_FROM_NAME="ATS System"
+MAIL_FROM_ADDRESS="your-email@gmail.com"
+    `);
+    return false;
+  }
+  return true;
+};
+
+// Create transporter with error handling
+let transporter;
+try {
+  if (!validateEmailConfig()) {
+    throw new Error('Email configuration is incomplete');
+  }
+
+  transporter = nodemailer.createTransport({
+    host: process.env.MAIL_HOST,
+    port: parseInt(process.env.MAIL_PORT),
+    secure: process.env.MAIL_PORT === '465', // true for 465, false for other ports
+    auth: {
+      user: process.env.MAIL_USERNAME,
+      pass: process.env.MAIL_PASSWORD,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
+  // Verify transporter configuration
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error('❌ Email transporter verification failed:', error.message);
+      console.error('Please check your email configuration in .env file');
+    } else {
+      console.log('✅ Email transporter is ready to send messages');
+    }
+  });
+} catch (error) {
+  console.error('❌ Failed to create email transporter:', error.message);
+  transporter = null;
+}
+
+// Helper function to check if email service is available
+const isEmailServiceAvailable = () => {
+  return transporter !== null;
+};
+
+// Helper function to send email with error handling
+const sendEmailWithErrorHandling = async (mailOptions, emailType = 'email') => {
+  if (!transporter) {
+    throw new Error('Email service is not configured. Please check your .env file and email configuration.');
+  }
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ ${emailType} sent successfully`);
+  } catch (error) {
+    console.error(`❌ Failed to send ${emailType}:`, error.message);
+    throw new Error(`Email sending failed: ${error.message}`);
+  }
+};
 
 const sendOtpEmail = async (email, otp) => {
   const mailOptions = {
@@ -41,7 +104,7 @@ const sendOtpEmail = async (email, otp) => {
 `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await sendEmailWithErrorHandling(mailOptions, `OTP email to ${email}`);
 };
 
 // Function to send job creation notification email
@@ -417,5 +480,29 @@ const sendUserTypeChangeEmail = async (email, userData, oldUserType, newUserType
   }
 };
 
-export { sendOtpEmail, sendJobCreateEmail, sendJobUpdateEmail, sendJobDeleteEmail, sendJobApplicationEmail, sendNewApplicationNotification, sendPipelineStatusChangeRecruiterEmail, sendPipelineStatusChangeCandidateEmail, sendInterviewScheduledRecruiterEmail, sendInterviewScheduledCandidateEmail, sendTimesheetCreateEmail, sendTimesheetUpdateEmail, sendTimesheetDeleteEmail, sendTimesheetApprovalEmail, sendCustomerCreateEmail, sendCustomerUpdateEmail, sendCustomerDeleteEmail, sendUserCreateEmail, sendUserUpdateEmail, sendUserDeleteEmail, sendUserTypeChangeEmail };
+export { 
+  sendOtpEmail, 
+  sendJobCreateEmail, 
+  sendJobUpdateEmail, 
+  sendJobDeleteEmail, 
+  sendJobApplicationEmail, 
+  sendNewApplicationNotification, 
+  sendPipelineStatusChangeRecruiterEmail, 
+  sendPipelineStatusChangeCandidateEmail, 
+  sendInterviewScheduledRecruiterEmail, 
+  sendInterviewScheduledCandidateEmail, 
+  sendTimesheetCreateEmail, 
+  sendTimesheetUpdateEmail, 
+  sendTimesheetDeleteEmail, 
+  sendTimesheetApprovalEmail, 
+  sendCustomerCreateEmail, 
+  sendCustomerUpdateEmail, 
+  sendCustomerDeleteEmail, 
+  sendUserCreateEmail, 
+  sendUserUpdateEmail, 
+  sendUserDeleteEmail, 
+  sendUserTypeChangeEmail,
+  isEmailServiceAvailable,
+  sendEmailWithErrorHandling
+};
 export default sendOtpEmail;

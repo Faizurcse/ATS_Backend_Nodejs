@@ -38,9 +38,9 @@ model Customer {
   annualRevenue String?
   contractValue Decimal?         @db.Decimal(10, 2)
   billingCycle  String?
-  email         String?          // Added email field for customer contact
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  email         String?
   jobs          Ats_JobPost[]
 }
 
@@ -68,6 +68,7 @@ model Ats_JobPost {
   workType         WorkType               @default(ONSITE)
   customerId       Int?
   email            String
+  embedding        Json?
   customer         Customer?              @relation(fields: [customerId], references: [id])
   applications     CandidateApplication[]
   timesheetEntries TimesheetEntry[]
