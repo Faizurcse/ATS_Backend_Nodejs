@@ -57,7 +57,8 @@ const validateEnumValues = (workType, jobStatus) => {
 
 
 
-export const createJobPost = async (req, res) => {
+// Helper function to validate and process a single job
+const processSingleJob = async (jobData, req) => {
   const {
     title,
     company,
@@ -79,82 +80,184 @@ export const createJobPost = async (req, res) => {
     requirements,
     requiredSkills,
     benefits
-  } = req.body;
+  } = jobData;
 
+  // Validate required fields
+  if (!email || !email.trim()) {
+    throw new Error('Email is required for job posting');
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error('Invalid email format');
+  }
+
+  // Validate enum values
+  validateEnumValues(workType, jobStatus);
+
+  // Create fullLocation if not provided
+  const finalFullLocation = fullLocation || (city && country ? `${city}, ${country}` : city || country || '');
+
+  // Convert salary strings to integers
+  const convertSalaryToInt = (salary) => {
+    if (!salary) return null;
+    if (typeof salary === 'number') return salary;
+    
+    // Remove $, commas, and spaces, then convert to integer
+    const cleanSalary = salary.toString().replace(/[$,\s]/g, '');
+    const parsed = parseInt(cleanSalary, 10);
+    return isNaN(parsed) ? null : parsed;
+  };
+
+  const finalSalaryMin = convertSalaryToInt(salaryMin);
+  const finalSalaryMax = convertSalaryToInt(salaryMax);
+
+  // Debug logging
+  console.log(`🔍 Salary Debug for ${title}:`);
+  console.log(`  Original salaryMin: "${salaryMin}" (type: ${typeof salaryMin})`);
+  console.log(`  Original salaryMax: "${salaryMax}" (type: ${typeof salaryMax})`);
+  console.log(`  Converted salaryMin: ${finalSalaryMin} (type: ${typeof finalSalaryMin})`);
+  console.log(`  Converted salaryMax: ${finalSalaryMax} (type: ${typeof finalSalaryMax})`);
+
+  // Create a new job post in the database
+  const newJob = await prisma.ats_JobPost.create({
+    data: {
+      title,
+      company,
+      department,
+      internalSPOC,
+      recruiter,
+      email,
+      jobType,
+      experienceLevel,
+      country,
+      city,
+      fullLocation: finalFullLocation,
+      workType: workType ? workType.toUpperCase() : 'ONSITE',
+      jobStatus: jobStatus ? jobStatus.toUpperCase() : 'ACTIVE',
+      salaryMin: finalSalaryMin,
+      salaryMax: finalSalaryMax,
+      priority,
+      description,
+      requirements,
+      requiredSkills,
+      benefits,
+    }
+  });
+
+  // Send email notification for job creation
+  if (newJob.email) {
+    try {
+      const createInfo = {
+        createdBy: req.user?.name || req.user?.email || 'System Administrator',
+        createdAt: new Date(),
+        reason: jobData.createReason || 'New job posting created',
+        jobId: newJob.id
+      };
+      await sendJobCreateEmail(newJob.email, newJob, createInfo);
+    } catch (emailError) {
+      console.error('Failed to send creation email:', emailError);
+      // Don't fail the request if email fails
+    }
+  }
+
+  return newJob;
+};
+
+export const createJobPost = async (req, res) => {
   try {
-    // Validate required fields
-    if (!email || !email.trim()) {
-      return res.status(400).json({ 
-        message: 'Email is required for job posting',
-        error: 'Please provide a valid email address'
-      });
-    }
+    // Check if request body is an array (bulk posting) or single object
+    const isBulkPosting = Array.isArray(req.body);
+    const jobsData = isBulkPosting ? req.body : [req.body];
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
-        message: 'Invalid email format',
-        error: 'Please provide a valid email address'
-      });
-    }
+    console.log(`🚀 ${isBulkPosting ? 'BULK' : 'SINGLE'} job posting request received`);
+    console.log(`📊 Processing ${jobsData.length} job(s)`);
 
-    // Validate enum values
-    validateEnumValues(workType, jobStatus);
+    const results = [];
+    const errors = [];
 
-    // Create fullLocation if not provided
-    const finalFullLocation = fullLocation || (city && country ? `${city}, ${country}` : city || country || '');
-
-    // Create a new job post in the database
-    const newJob = await prisma.ats_JobPost.create({
-      data: {
-        title,
-        company,
-        department,
-        internalSPOC,
-        recruiter,
-        email,
-        jobType,
-        experienceLevel,
-        country,
-        city,
-        fullLocation: finalFullLocation,
-        workType: workType ? workType.toUpperCase() : 'ONSITE',
-        jobStatus: jobStatus ? jobStatus.toUpperCase() : 'ACTIVE',
-        salaryMin,
-        salaryMax,
-        priority,
-        description,
-        requirements,
-        requiredSkills,
-        benefits,
-      }
-    });
-
-    // Send email notification for job creation
-    if (newJob.email) {
+    // Process each job
+    for (let i = 0; i < jobsData.length; i++) {
       try {
-        const createInfo = {
-          createdBy: req.user?.name || req.user?.email || 'System Administrator',
-          createdAt: new Date(),
-          reason: req.body.createReason || 'New job posting created',
-          jobId: newJob.id
-        };
-        await sendJobCreateEmail(newJob.email, newJob, createInfo);
-      } catch (emailError) {
-        console.error('Failed to send creation email:', emailError);
-        // Don't fail the request if email fails
+        const jobData = jobsData[i];
+        console.log(`📝 Processing job ${i + 1}/${jobsData.length}: ${jobData.title || 'Untitled'}`);
+        
+        const newJob = await processSingleJob(jobData, req);
+        results.push({
+          index: i,
+          success: true,
+          job: newJob
+        });
+        console.log(`✅ Job ${i + 1} created successfully with ID: ${newJob.id}`);
+      } catch (error) {
+        console.error(`❌ Job ${i + 1} failed:`, error.message);
+        errors.push({
+          index: i,
+          success: false,
+          error: error.message,
+          jobData: jobsData[i]
+        });
       }
     }
 
+    // Prepare response based on results
+    const successCount = results.length;
+    const errorCount = errors.length;
 
-
-    res.status(201).json({
-      message: 'Job post created successfully!',
-      job: newJob
-    });
+    if (isBulkPosting) {
+      if (successCount === 0) {
+        return res.status(400).json({
+          message: 'All job postings failed',
+          success: false,
+          totalJobs: jobsData.length,
+          successfulJobs: successCount,
+          failedJobs: errorCount,
+          results: results,
+          errors: errors
+        });
+      } else if (errorCount > 0) {
+        return res.status(207).json({ // 207 Multi-Status for partial success
+          message: `Bulk job posting completed with ${errorCount} error(s)`,
+          success: true,
+          totalJobs: jobsData.length,
+          successfulJobs: successCount,
+          failedJobs: errorCount,
+          results: results,
+          errors: errors
+        });
+      } else {
+        return res.status(201).json({
+          message: `All ${successCount} job postings created successfully!`,
+          success: true,
+          totalJobs: jobsData.length,
+          successfulJobs: successCount,
+          failedJobs: errorCount,
+          results: results
+        });
+      }
+    } else {
+      // Single job posting
+      if (successCount === 1) {
+        return res.status(201).json({
+          message: 'Job post created successfully!',
+          success: true,
+          job: results[0].job
+        });
+      } else {
+        return res.status(400).json({
+          message: 'Job post creation failed',
+          success: false,
+          error: errors[0].error
+        });
+      }
+    }
   } catch (error) {
-    res.status(500).json({ message: 'Error creating job post', error: error.message });
+    console.error('❌ Unexpected error in createJobPost:', error);
+    res.status(500).json({ 
+      message: 'Error creating job post(s)', 
+      error: error.message 
+    });
   }
 };
 
