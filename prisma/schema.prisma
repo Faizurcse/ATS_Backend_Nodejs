@@ -147,7 +147,6 @@ model TimesheetEntry {
   job            Ats_JobPost?    @relation(fields: [jobId], references: [id], onDelete: Cascade)
 }
 
-
 enum CustomerStatus {
   ACTIVE
   INACTIVE
